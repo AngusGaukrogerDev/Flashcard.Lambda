@@ -1,6 +1,6 @@
 using Amazon.Lambda.Core;
 
-namespace Flashcards.Functions.Deck;
+namespace Flashcards.Functions;
 
 public class UpdateDeckFunction
 {

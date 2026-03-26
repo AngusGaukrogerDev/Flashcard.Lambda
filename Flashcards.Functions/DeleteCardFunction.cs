@@ -1,6 +1,6 @@
 using Amazon.Lambda.Core;
 
-namespace Flashcards.Functions.Card;
+namespace Flashcards.Functions;
 
 public class DeleteCardFunction
 {

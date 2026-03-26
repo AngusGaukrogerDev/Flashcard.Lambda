@@ -1,6 +1,6 @@
 # Flashcards Backend
 
-A .NET 10 serverless backend for a flashcard application, built with AWS Lambda. The project follows a clean architecture structure with discrete Lambda function handlers for deck and card operations.
+A .NET 8 serverless backend for a flashcard application, built with AWS Lambda. The project follows a clean architecture structure with discrete Lambda function handlers for deck and card operations.
 
 ## Architecture
 
@@ -38,13 +38,13 @@ The solution is organised into the following projects:
 
 ## Tech Stack
 
-- **.NET 10**
+- **.NET 8**
 - **AWS Lambda** (`Amazon.Lambda.Core`, `Amazon.Lambda.Serialization.SystemTextJson`)
 - **xUnit** (testing)
 
 ## Prerequisites
 
-- [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download)
+- [.NET 8 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/8.0)
 - [AWS CLI](https://aws.amazon.com/cli/) (for deployment)
 - [Amazon.Lambda.Tools](https://github.com/aws/aws-extensions-for-dotnet-cli) (for deployment)
 
@@ -75,7 +75,7 @@ cd Flashcards.Functions
 dotnet lambda deploy-function
 ```
 
-`Flashcards.Functions/aws-lambda-tools-defaults.json` contains the default deployment configuration (runtime `dotnet10`, 512 MB memory, 30 s timeout). Ensure your AWS profile and region are configured before deploying.
+`Flashcards.Functions/aws-lambda-tools-defaults.json` contains the default deployment configuration (runtime `dotnet8`, 512 MB memory, 30 s timeout). Ensure your AWS profile and region are configured before deploying.
 
 ## Project Status
 
