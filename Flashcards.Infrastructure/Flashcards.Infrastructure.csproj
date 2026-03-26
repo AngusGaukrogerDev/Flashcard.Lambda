@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Flashcards.Application\Flashcards.Application.csproj" />
+      <ProjectReference Include="..\Flashcards.Domain\Flashcards.Domain.csproj" />
+    </ItemGroup>
+
+</Project>
