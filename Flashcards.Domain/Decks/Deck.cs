@@ -30,4 +30,13 @@ public class Deck
 
     public static Deck Reconstitute(DeckId id, string name, string? description, DateTime createdAt, string userId)
         => new(id, name, description, createdAt, userId);
+
+    public void Update(string name, string? description)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Deck name cannot be empty.", nameof(name));
+
+        Name = name.Trim();
+        Description = description?.Trim();
+    }
 }

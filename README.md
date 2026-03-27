@@ -1,33 +1,36 @@
 # Flashcards Backend
 
-A .NET 8 serverless backend for a flashcard application, built with AWS Lambda. The project follows a clean architecture structure with discrete Lambda function handlers for deck and card operations.
+A .NET 8 serverless backend for a flashcard application, built on AWS Lambda and DynamoDB. The project follows clean architecture with CQRS for all use cases.
 
 ## Architecture
 
-The solution is organised into the following projects:
+```
+Flashcards.Functions       ← Lambda entry points (HTTP API v2)
+Flashcards.Application     ← CQRS commands/queries and handlers
+Flashcards.Domain          ← Core entities and domain exceptions
+Flashcards.Infrastructure  ← DynamoDB repository implementations
+```
 
-| Project | Description |
-|---|---|
-| `Flashcards.Functions` | AWS Lambda function handlers for deck and card operations |
-| `Flashcards.Domain` | Core domain entities and business rules |
-| `Flashcards.Application` | Application logic and use cases |
-| `Flashcards.Infrastructure` | Data access and external service integrations |
-| `Flashcards.Application.Tests` | Unit tests for the application layer |
-| `Flashcards.Domain.Tests` | Unit tests for the domain layer |
-| `Flashcards.Infrastructure.Tests` | Unit tests for the infrastructure layer |
+### Project dependencies
+
+```
+Functions → Application + Infrastructure
+Infrastructure → Application + Domain
+Application → Domain
+```
 
 ## Lambda Functions
 
 ### Deck
 
-| Class | Description |
-|---|---|
-| `CreateDeckFunction` | Create a new flashcard deck |
-| `GetDeckFunction` | Retrieve a deck |
-| `UpdateDeckFunction` | Update an existing deck |
-| `ReviewDeckFunction` | Start a review session for a deck |
+| Class | HTTP Method | Description |
+|---|---|---|
+| `CreateDeckFunction` | `POST /decks` | Create a new flashcard deck |
+| `GetDecksFunction` | `GET /decks` | List decks for the authenticated user (paginated) |
+| `UpdateDeckFunction` | `PUT /decks/{deckId}` | Update a deck's name or description |
+| `DeleteDeckFunction` | `DELETE /decks/{deckId}` | Delete a deck |
 
-### Card
+### Card (stubs — not yet implemented)
 
 | Class | Description |
 |---|---|
@@ -35,12 +38,52 @@ The solution is organised into the following projects:
 | `UpdateCardFunction` | Update an existing card |
 | `RemoveCardFromDeckFunction` | Remove a card from a deck |
 | `DeleteCardFunction` | Permanently delete a card |
+| `ReviewDeckFunction` | Start a review session for a deck |
+
+## Authentication
+
+All functions expect an **API Gateway HTTP API v2 JWT authorizer**. The `sub` claim from the JWT is used as the `userId`. Requests without a valid `sub` receive a `401 Unauthorised` response.
+
+For update and delete operations, the caller's `userId` must match the `userId` stored on the deck. A mismatch returns `403 Forbidden`.
+
+## CQRS
+
+All use cases follow a command/query pattern:
+
+| Type | Class | Description |
+|---|---|---|
+| Command | `CreateDeckCommand` / `CreateDeckCommandHandler` | Create a deck |
+| Command | `UpdateDeckCommand` / `UpdateDeckCommandHandler` | Update a deck |
+| Command | `DeleteDeckCommand` / `DeleteDeckCommandHandler` | Delete a deck |
+| Query | `GetDecksQuery` / `GetDecksQueryHandler` | List decks by user |
+
+## Data Storage
+
+Decks are stored in a **DynamoDB** table with the following structure:
+
+| Attribute | Type | Notes |
+|---|---|---|
+| `Id` | String (UUID) | Partition key |
+| `UserId` | String | GSI partition key (for listing by user) |
+| `Name` | String | |
+| `Description` | String | Optional |
+| `CreatedAt` | String (ISO 8601) | |
+
+The GSI name is supplied via the `DECK_USER_ID_INDEX_NAME` environment variable.
+
+### Environment variables
+
+| Variable | Description |
+|---|---|
+| `DECK_TABLE_NAME` | DynamoDB table name |
+| `DECK_USER_ID_INDEX_NAME` | Name of the GSI on `UserId` |
 
 ## Tech Stack
 
 - **.NET 8**
-- **AWS Lambda** (`Amazon.Lambda.Core`, `Amazon.Lambda.Serialization.SystemTextJson`)
-- **xUnit** (testing)
+- **AWS Lambda** (`Amazon.Lambda.Core`, `Amazon.Lambda.APIGatewayEvents`)
+- **Amazon DynamoDB** (`AWSSDK.DynamoDBv2`)
+- **xUnit** + **NSubstitute** + **Shouldly** (testing)
 
 ## Prerequisites
 
@@ -68,15 +111,11 @@ dotnet test Flashcards.sln
 
 ## Deployment
 
-### Deploy an individual Lambda function
+Deploy an individual Lambda function from the `Flashcards.Functions` directory:
 
 ```bash
 cd Flashcards.Functions
-dotnet lambda deploy-function
+dotnet lambda deploy-function --function-handler "Flashcards.Functions::Flashcards.Functions.CreateDeckFunction::FunctionHandler"
 ```
 
-`Flashcards.Functions/aws-lambda-tools-defaults.json` contains the default deployment configuration (runtime `dotnet8`, 512 MB memory, 30 s timeout). Ensure your AWS profile and region are configured before deploying.
-
-## Project Status
-
-This project is in early development. The clean architecture scaffolding (Domain, Application, Infrastructure) is in place and the Lambda function handlers for all deck and card operations have been stubbed out. Core business logic and persistence are yet to be implemented.
+`Flashcards.Functions/aws-lambda-tools-defaults.json` contains default deployment configuration (runtime `dotnet8`, 512 MB memory, 30 s timeout). Ensure your AWS profile and region are configured before deploying.

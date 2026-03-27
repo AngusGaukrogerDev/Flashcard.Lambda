@@ -42,6 +42,22 @@ public class DeckDynamoDbRepository : IDeckRepository
         await _dynamoDb.PutItemAsync(request, cancellationToken);
     }
 
+    public async Task<Deck?> GetByIdAsync(string deckId, CancellationToken cancellationToken = default)
+    {
+        var request = new GetItemRequest
+        {
+            TableName = _tableName,
+            Key = new Dictionary<string, AttributeValue>
+            {
+                ["Id"] = new() { S = deckId }
+            }
+        };
+
+        var response = await _dynamoDb.GetItemAsync(request, cancellationToken);
+
+        return response.Item?.Count > 0 ? MapToDeck(response.Item) : null;
+    }
+
     public async Task<(IReadOnlyList<Deck> Decks, string? NextPaginationToken)> GetByUserIdAsync(
         string userId,
         int? pageSize = null,
@@ -73,6 +89,20 @@ public class DeckDynamoDbRepository : IDeckRepository
             : null;
 
         return (decks, nextToken);
+    }
+
+    public async Task DeleteAsync(string deckId, CancellationToken cancellationToken = default)
+    {
+        var request = new DeleteItemRequest
+        {
+            TableName = _tableName,
+            Key = new Dictionary<string, AttributeValue>
+            {
+                ["Id"] = new() { S = deckId }
+            }
+        };
+
+        await _dynamoDb.DeleteItemAsync(request, cancellationToken);
     }
 
     private static Deck MapToDeck(Dictionary<string, AttributeValue> item)

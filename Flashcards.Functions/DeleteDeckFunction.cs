@@ -2,22 +2,22 @@ using System.Net;
 using System.Text.Json;
 using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
-using Flashcards.Application.Decks.UpdateDeck;
+using Flashcards.Application.Decks.DeleteDeck;
 using Flashcards.Domain.Decks;
 using Flashcards.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Flashcards.Functions;
 
-public class UpdateDeckFunction
+public class DeleteDeckFunction
 {
-    private readonly UpdateDeckCommandHandler _handler;
+    private readonly DeleteDeckCommandHandler _handler;
 
-    public UpdateDeckFunction() : this(BuildServiceProvider()) { }
+    public DeleteDeckFunction() : this(BuildServiceProvider()) { }
 
-    internal UpdateDeckFunction(IServiceProvider serviceProvider)
+    internal DeleteDeckFunction(IServiceProvider serviceProvider)
     {
-        _handler = serviceProvider.GetRequiredService<UpdateDeckCommandHandler>();
+        _handler = serviceProvider.GetRequiredService<DeleteDeckCommandHandler>();
     }
 
     public async Task<APIGatewayHttpApiV2ProxyResponse> FunctionHandler(
@@ -38,24 +38,13 @@ public class UpdateDeckFunction
             if (string.IsNullOrEmpty(deckId))
                 return ErrorResponse(HttpStatusCode.BadRequest, "Deck ID is required.");
 
-            var body = JsonSerializer.Deserialize<UpdateDeckRequestBody>(
-                request.Body ?? string.Empty,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-            if (body is null)
-                return ErrorResponse(HttpStatusCode.BadRequest, "Request body is required.");
-
-            var command = new UpdateDeckCommand(deckId, userId, body.Name, body.Description);
-            var response = await _handler.HandleAsync(command);
+            var command = new DeleteDeckCommand(deckId, userId);
+            await _handler.HandleAsync(command);
 
             return new APIGatewayHttpApiV2ProxyResponse
             {
-                StatusCode = (int)HttpStatusCode.OK,
-                Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } },
-                Body = JsonSerializer.Serialize(response, new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                })
+                StatusCode = (int)HttpStatusCode.NoContent,
+                Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } }
             };
         }
         catch (DeckNotFoundException ex)
@@ -64,15 +53,11 @@ public class UpdateDeckFunction
         }
         catch (UnauthorisedDeckAccessException)
         {
-            return ErrorResponse(HttpStatusCode.Forbidden, "You do not have permission to update this deck.");
-        }
-        catch (ArgumentException ex)
-        {
-            return ErrorResponse(HttpStatusCode.BadRequest, ex.Message);
+            return ErrorResponse(HttpStatusCode.Forbidden, "You do not have permission to delete this deck.");
         }
         catch (Exception ex)
         {
-            context.Logger.LogError($"Unhandled error updating deck: {ex}");
+            context.Logger.LogError($"Unhandled error deleting deck: {ex}");
             return ErrorResponse(HttpStatusCode.InternalServerError, "An unexpected error occurred.");
         }
     }
@@ -85,8 +70,6 @@ public class UpdateDeckFunction
             Body = JsonSerializer.Serialize(new { error = message })
         };
 
-    private record UpdateDeckRequestBody(string Name, string? Description);
-
     private static IServiceProvider BuildServiceProvider()
     {
         var deckTableName = Environment.GetEnvironmentVariable("DECK_TABLE_NAME")
@@ -97,7 +80,7 @@ public class UpdateDeckFunction
 
         var services = new ServiceCollection();
         services.AddInfrastructure(deckTableName, userIdIndexName);
-        services.AddScoped<UpdateDeckCommandHandler>();
+        services.AddScoped<DeleteDeckCommandHandler>();
 
         return services.BuildServiceProvider();
     }
