@@ -15,7 +15,7 @@ public class CreateDeckCommandHandler
         CreateDeckCommand command,
         CancellationToken cancellationToken = default)
     {
-        var deck = Deck.Create(command.Name, command.Description);
+        var deck = Deck.Create(command.Name, command.UserId, command.Description);
 
         await _deckRepository.SaveAsync(deck, cancellationToken);
 

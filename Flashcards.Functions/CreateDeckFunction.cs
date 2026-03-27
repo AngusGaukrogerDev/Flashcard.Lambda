@@ -25,12 +25,20 @@ public class CreateDeckFunction
     {
         try
         {
-            var command = JsonSerializer.Deserialize<CreateDeckCommand>(
+            var claims = request.RequestContext?.Authorizer?.Jwt?.Claims;
+            var userId = claims is not null && claims.TryGetValue("sub", out var sub) ? sub : null;
+
+            if (string.IsNullOrEmpty(userId))
+                return ErrorResponse(HttpStatusCode.Unauthorized, "Unauthorised.");
+
+            var body = JsonSerializer.Deserialize<CreateDeckRequestBody>(
                 request.Body ?? string.Empty,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-            if (command is null)
+            if (body is null)
                 return ErrorResponse(HttpStatusCode.BadRequest, "Request body is required.");
+
+            var command = new CreateDeckCommand(body.Name, body.Description, userId);
 
             var response = await _handler.HandleAsync(command);
 
@@ -59,6 +67,8 @@ public class CreateDeckFunction
             Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } },
             Body = JsonSerializer.Serialize(new { error = message })
         };
+
+    private record CreateDeckRequestBody(string Name, string? Description);
 
     private static IServiceProvider BuildServiceProvider()
     {

@@ -22,7 +22,8 @@ public class DeckDynamoDbRepository : IDeckRepository
         {
             ["Id"] = new() { S = deck.Id.Value.ToString() },
             ["Name"] = new() { S = deck.Name },
-            ["CreatedAt"] = new() { S = deck.CreatedAt.ToString("O") }
+            ["CreatedAt"] = new() { S = deck.CreatedAt.ToString("O") },
+            ["UserId"] = new() { S = deck.UserId }
         };
 
         if (deck.Description is not null)
