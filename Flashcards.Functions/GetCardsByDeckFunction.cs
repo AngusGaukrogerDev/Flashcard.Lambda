@@ -2,22 +2,22 @@ using System.Net;
 using System.Text.Json;
 using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
-using Flashcards.Application.Cards.UpdateCard;
-using Flashcards.Domain.Cards;
+using Flashcards.Application.Cards.GetCardsByDeck;
+using Flashcards.Domain.Decks;
 using Flashcards.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Flashcards.Functions;
 
-public class UpdateCardFunction
+public class GetCardsByDeckFunction
 {
-    private readonly UpdateCardCommandHandler _handler;
+    private readonly GetCardsByDeckQueryHandler _handler;
 
-    public UpdateCardFunction() : this(BuildServiceProvider()) { }
+    public GetCardsByDeckFunction() : this(BuildServiceProvider()) { }
 
-    internal UpdateCardFunction(IServiceProvider serviceProvider)
+    internal GetCardsByDeckFunction(IServiceProvider serviceProvider)
     {
-        _handler = serviceProvider.GetRequiredService<UpdateCardCommandHandler>();
+        _handler = serviceProvider.GetRequiredService<GetCardsByDeckQueryHandler>();
     }
 
     public async Task<APIGatewayHttpApiV2ProxyResponse> FunctionHandler(
@@ -32,21 +32,14 @@ public class UpdateCardFunction
             if (string.IsNullOrEmpty(userId))
                 return ErrorResponse(HttpStatusCode.Unauthorized, "Unauthorised.");
 
-            string? cardId = null;
-            request.PathParameters?.TryGetValue("cardId", out cardId);
+            string? deckId = null;
+            request.PathParameters?.TryGetValue("deckId", out deckId);
 
-            if (string.IsNullOrEmpty(cardId))
-                return ErrorResponse(HttpStatusCode.BadRequest, "Card ID is required.");
+            if (string.IsNullOrEmpty(deckId))
+                return ErrorResponse(HttpStatusCode.BadRequest, "Deck ID is required.");
 
-            var body = JsonSerializer.Deserialize<UpdateCardRequestBody>(
-                request.Body ?? string.Empty,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-            if (body is null)
-                return ErrorResponse(HttpStatusCode.BadRequest, "Request body is required.");
-
-            var command = new UpdateCardCommand(cardId, userId, body.FrontText, body.BackText);
-            var response = await _handler.HandleAsync(command);
+            var query = new GetCardsByDeckQuery(deckId, userId);
+            var response = await _handler.HandleAsync(query);
 
             return new APIGatewayHttpApiV2ProxyResponse
             {
@@ -58,21 +51,17 @@ public class UpdateCardFunction
                 })
             };
         }
-        catch (CardNotFoundException ex)
+        catch (DeckNotFoundException ex)
         {
             return ErrorResponse(HttpStatusCode.NotFound, ex.Message);
         }
-        catch (UnauthorisedCardAccessException)
+        catch (UnauthorisedDeckAccessException)
         {
-            return ErrorResponse(HttpStatusCode.Forbidden, "You do not have permission to update this card.");
-        }
-        catch (ArgumentException ex)
-        {
-            return ErrorResponse(HttpStatusCode.BadRequest, ex.Message);
+            return ErrorResponse(HttpStatusCode.Forbidden, "You do not have permission to access this deck.");
         }
         catch (Exception ex)
         {
-            context.Logger.LogError($"Unhandled error updating card: {ex}");
+            context.Logger.LogError($"Unhandled error retrieving cards for deck: {ex}");
             return ErrorResponse(HttpStatusCode.InternalServerError, "An unexpected error occurred.");
         }
     }
@@ -85,16 +74,24 @@ public class UpdateCardFunction
             Body = JsonSerializer.Serialize(new { error = message })
         };
 
-    private record UpdateCardRequestBody(string FrontText, string BackText);
-
     private static IServiceProvider BuildServiceProvider()
     {
+        var deckTableName = Environment.GetEnvironmentVariable("DECK_TABLE_NAME")
+            ?? throw new InvalidOperationException("Environment variable 'DECK_TABLE_NAME' is not set.");
+
+        var deckUserIdIndexName = Environment.GetEnvironmentVariable("DECK_USER_ID_INDEX_NAME")
+            ?? throw new InvalidOperationException("Environment variable 'DECK_USER_ID_INDEX_NAME' is not set.");
+
         var cardTableName = Environment.GetEnvironmentVariable("CARD_TABLE_NAME")
             ?? throw new InvalidOperationException("Environment variable 'CARD_TABLE_NAME' is not set.");
 
+        var cardDeckIdIndexName = Environment.GetEnvironmentVariable("CARD_DECK_ID_INDEX_NAME")
+            ?? throw new InvalidOperationException("Environment variable 'CARD_DECK_ID_INDEX_NAME' is not set.");
+
         var services = new ServiceCollection();
-        services.AddCardInfrastructure(cardTableName);
-        services.AddScoped<UpdateCardCommandHandler>();
+        services.AddInfrastructure(deckTableName, deckUserIdIndexName);
+        services.AddCardInfrastructure(cardTableName, cardDeckIdIndexName);
+        services.AddScoped<GetCardsByDeckQueryHandler>();
 
         return services.BuildServiceProvider();
     }

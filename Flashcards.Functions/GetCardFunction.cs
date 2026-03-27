@@ -2,22 +2,22 @@ using System.Net;
 using System.Text.Json;
 using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
-using Flashcards.Application.Cards.DeleteCard;
+using Flashcards.Application.Cards.GetCardById;
 using Flashcards.Domain.Cards;
 using Flashcards.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Flashcards.Functions;
 
-public class DeleteCardFunction
+public class GetCardFunction
 {
-    private readonly DeleteCardCommandHandler _handler;
+    private readonly GetCardByIdQueryHandler _handler;
 
-    public DeleteCardFunction() : this(BuildServiceProvider()) { }
+    public GetCardFunction() : this(BuildServiceProvider()) { }
 
-    internal DeleteCardFunction(IServiceProvider serviceProvider)
+    internal GetCardFunction(IServiceProvider serviceProvider)
     {
-        _handler = serviceProvider.GetRequiredService<DeleteCardCommandHandler>();
+        _handler = serviceProvider.GetRequiredService<GetCardByIdQueryHandler>();
     }
 
     public async Task<APIGatewayHttpApiV2ProxyResponse> FunctionHandler(
@@ -38,13 +38,17 @@ public class DeleteCardFunction
             if (string.IsNullOrEmpty(cardId))
                 return ErrorResponse(HttpStatusCode.BadRequest, "Card ID is required.");
 
-            var command = new DeleteCardCommand(cardId, userId);
-            await _handler.HandleAsync(command);
+            var query = new GetCardByIdQuery(cardId, userId);
+            var response = await _handler.HandleAsync(query);
 
             return new APIGatewayHttpApiV2ProxyResponse
             {
-                StatusCode = (int)HttpStatusCode.NoContent,
-                Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } }
+                StatusCode = (int)HttpStatusCode.OK,
+                Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } },
+                Body = JsonSerializer.Serialize(response, new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                })
             };
         }
         catch (CardNotFoundException ex)
@@ -53,11 +57,11 @@ public class DeleteCardFunction
         }
         catch (UnauthorisedCardAccessException)
         {
-            return ErrorResponse(HttpStatusCode.Forbidden, "You do not have permission to delete this card.");
+            return ErrorResponse(HttpStatusCode.Forbidden, "You do not have permission to access this card.");
         }
         catch (Exception ex)
         {
-            context.Logger.LogError($"Unhandled error deleting card: {ex}");
+            context.Logger.LogError($"Unhandled error retrieving card: {ex}");
             return ErrorResponse(HttpStatusCode.InternalServerError, "An unexpected error occurred.");
         }
     }
@@ -77,7 +81,7 @@ public class DeleteCardFunction
 
         var services = new ServiceCollection();
         services.AddCardInfrastructure(cardTableName);
-        services.AddScoped<DeleteCardCommandHandler>();
+        services.AddScoped<GetCardByIdQueryHandler>();
 
         return services.BuildServiceProvider();
     }

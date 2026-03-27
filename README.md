@@ -30,25 +30,28 @@ Application → Domain
 | `UpdateDeckFunction` | `PUT /decks/{deckId}` | Update a deck's name or description |
 | `DeleteDeckFunction` | `DELETE /decks/{deckId}` | Delete a deck |
 
-### Card (stubs — not yet implemented)
+### Card
 
-| Class | Description |
-|---|---|
-| `AddCardToDeckFunction` | Add a new card to a deck |
-| `UpdateCardFunction` | Update an existing card |
-| `RemoveCardFromDeckFunction` | Remove a card from a deck |
-| `DeleteCardFunction` | Permanently delete a card |
-| `ReviewDeckFunction` | Start a review session for a deck |
+| Class | HTTP Method | Description |
+|---|---|---|
+| `AddCardToDeckFunction` | `POST /decks/{deckId}/cards` | Add a new card to a deck |
+| `GetCardFunction` | `GET /cards/{cardId}` | Get a card by ID |
+| `UpdateCardFunction` | `PUT /cards/{cardId}` | Update a card's front or back text |
+| `DeleteCardFunction` | `DELETE /cards/{cardId}` | Delete a card |
 
 ## Authentication
 
 All functions expect an **API Gateway HTTP API v2 JWT authorizer**. The `sub` claim from the JWT is used as the `userId`. Requests without a valid `sub` receive a `401 Unauthorised` response.
 
-For update and delete operations, the caller's `userId` must match the `userId` stored on the deck. A mismatch returns `403 Forbidden`.
+For mutation operations, the caller's `userId` must match the `userId` stored on the resource. A mismatch returns `403 Forbidden`.
+
+`AddCardToDeckFunction` additionally verifies that the target deck exists and belongs to the authenticated user before creating the card.
 
 ## CQRS
 
 All use cases follow a command/query pattern:
+
+### Deck
 
 | Type | Class | Description |
 |---|---|---|
@@ -57,9 +60,20 @@ All use cases follow a command/query pattern:
 | Command | `DeleteDeckCommand` / `DeleteDeckCommandHandler` | Delete a deck |
 | Query | `GetDecksQuery` / `GetDecksQueryHandler` | List decks by user |
 
+### Card
+
+| Type | Class | Description |
+|---|---|---|
+| Command | `AddCardToDeckCommand` / `AddCardToDeckCommandHandler` | Add a card to a deck |
+| Command | `UpdateCardCommand` / `UpdateCardCommandHandler` | Update a card |
+| Command | `DeleteCardCommand` / `DeleteCardCommandHandler` | Delete a card |
+| Query | `GetCardByIdQuery` / `GetCardByIdQueryHandler` | Get a card by ID |
+
 ## Data Storage
 
-Decks are stored in a **DynamoDB** table with the following structure:
+### Decks
+
+Stored in a DynamoDB table with the following structure:
 
 | Attribute | Type | Notes |
 |---|---|---|
@@ -71,12 +85,29 @@ Decks are stored in a **DynamoDB** table with the following structure:
 
 The GSI name is supplied via the `DECK_USER_ID_INDEX_NAME` environment variable.
 
+### Cards
+
+Stored in a separate DynamoDB table with the following structure:
+
+| Attribute | Type | Notes |
+|---|---|---|
+| `Id` | String (UUID) | Partition key |
+| `DeckId` | String | The deck this card belongs to |
+| `UserId` | String | The user this card belongs to |
+| `FrontText` | String | |
+| `BackText` | String | |
+| `CreatedAt` | String (ISO 8601) | |
+| `NextReviewDate` | String (ISO 8601) | Optional — set by review logic |
+
 ### Environment variables
 
 | Variable | Description |
 |---|---|
-| `DECK_TABLE_NAME` | DynamoDB table name |
-| `DECK_USER_ID_INDEX_NAME` | Name of the GSI on `UserId` |
+| `DECK_TABLE_NAME` | DynamoDB table name for decks |
+| `DECK_USER_ID_INDEX_NAME` | Name of the GSI on `UserId` for the decks table |
+| `CARD_TABLE_NAME` | DynamoDB table name for cards |
+
+`AddCardToDeckFunction` requires all three variables. All other card functions require only `CARD_TABLE_NAME`. Deck functions require only `DECK_TABLE_NAME` and `DECK_USER_ID_INDEX_NAME`.
 
 ## Tech Stack
 
@@ -117,5 +148,18 @@ Deploy an individual Lambda function from the `Flashcards.Functions` directory:
 cd Flashcards.Functions
 dotnet lambda deploy-function --function-handler "Flashcards.Functions::Flashcards.Functions.CreateDeckFunction::FunctionHandler"
 ```
+
+Replace the handler class name with the function you want to deploy. Available handlers:
+
+| Handler class | Description |
+|---|---|
+| `CreateDeckFunction` | Create deck |
+| `GetDecksFunction` | List decks |
+| `UpdateDeckFunction` | Update deck |
+| `DeleteDeckFunction` | Delete deck |
+| `AddCardToDeckFunction` | Add card to deck |
+| `GetCardFunction` | Get card by ID |
+| `UpdateCardFunction` | Update card |
+| `DeleteCardFunction` | Delete card |
 
 `Flashcards.Functions/aws-lambda-tools-defaults.json` contains default deployment configuration (runtime `dotnet8`, 512 MB memory, 30 s timeout). Ensure your AWS profile and region are configured before deploying.
