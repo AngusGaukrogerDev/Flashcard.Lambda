@@ -2,21 +2,25 @@ using System.Net;
 using System.Text.Json;
 using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
+using Flashcards.Application.Abstractions.Commands;
 using Flashcards.Application.Decks.CreateDeck;
-using Flashcards.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Flashcards.Functions;
 
 public class CreateDeckFunction
 {
-    private readonly CreateDeckCommandHandler _handler;
+    private readonly ICommandHandler<CreateDeckCommand, CreateDeckResponse> _handler;
 
-    public CreateDeckFunction() : this(BuildServiceProvider()) { }
+    public CreateDeckFunction() : this(FunctionServiceProviderFactory.BuildDeckOnly(services =>
+    {
+        services.AddScoped<CreateDeckCommandHandler>();
+        services.AddScoped<ICommandHandler<CreateDeckCommand, CreateDeckResponse>>(sp => sp.GetRequiredService<CreateDeckCommandHandler>());
+    })) { }
 
     internal CreateDeckFunction(IServiceProvider serviceProvider)
     {
-        _handler = serviceProvider.GetRequiredService<CreateDeckCommandHandler>();
+        _handler = serviceProvider.GetRequiredService<ICommandHandler<CreateDeckCommand, CreateDeckResponse>>();
     }
 
     public async Task<APIGatewayHttpApiV2ProxyResponse> FunctionHandler(
@@ -25,63 +29,35 @@ public class CreateDeckFunction
     {
         try
         {
-            var claims = request.RequestContext?.Authorizer?.Jwt?.Claims;
-            var userId = claims is not null && claims.TryGetValue("sub", out var sub) ? sub : null;
+            var userId = LambdaRequestAuth.TryGetUserId(request);
 
             if (string.IsNullOrEmpty(userId))
-                return ErrorResponse(HttpStatusCode.Unauthorized, "Unauthorised.");
+                return ApiResponses.Error(HttpStatusCode.Unauthorized, "Unauthorised.");
 
             var body = JsonSerializer.Deserialize<CreateDeckRequestBody>(
                 request.Body ?? string.Empty,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                JsonDefaults.ReadOptions);
 
             if (body is null)
-                return ErrorResponse(HttpStatusCode.BadRequest, "Request body is required.");
+                return ApiResponses.Error(HttpStatusCode.BadRequest, "Request body is required.");
 
             var command = new CreateDeckCommand(body.Name, body.Description, userId);
 
             var response = await _handler.HandleAsync(command);
 
-            return new APIGatewayHttpApiV2ProxyResponse
-            {
-                StatusCode = (int)HttpStatusCode.Created,
-                Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } },
-                Body = JsonSerializer.Serialize(response)
-            };
+            return ApiResponses.Json(HttpStatusCode.Created, response);
         }
         catch (ArgumentException ex)
         {
-            return ErrorResponse(HttpStatusCode.BadRequest, ex.Message);
+            return ApiResponses.Error(HttpStatusCode.BadRequest, ex.Message);
         }
         catch (Exception ex)
         {
             context.Logger.LogError($"Unhandled error creating deck: {ex}");
-            return ErrorResponse(HttpStatusCode.InternalServerError, "An unexpected error occurred.");
+            return ApiResponses.Error(HttpStatusCode.InternalServerError, "An unexpected error occurred.");
         }
     }
 
-    private static APIGatewayHttpApiV2ProxyResponse ErrorResponse(HttpStatusCode statusCode, string message)
-        => new()
-        {
-            StatusCode = (int)statusCode,
-            Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } },
-            Body = JsonSerializer.Serialize(new { error = message })
-        };
-
     private record CreateDeckRequestBody(string Name, string? Description);
 
-    private static IServiceProvider BuildServiceProvider()
-    {
-        var deckTableName = Environment.GetEnvironmentVariable("DECK_TABLE_NAME")
-            ?? throw new InvalidOperationException("Environment variable 'DECK_TABLE_NAME' is not set.");
-
-        var userIdIndexName = Environment.GetEnvironmentVariable("DECK_USER_ID_INDEX_NAME")
-            ?? throw new InvalidOperationException("Environment variable 'DECK_USER_ID_INDEX_NAME' is not set.");
-
-        var services = new ServiceCollection();
-        services.AddInfrastructure(deckTableName, userIdIndexName);
-        services.AddScoped<CreateDeckCommandHandler>();
-
-        return services.BuildServiceProvider();
-    }
 }

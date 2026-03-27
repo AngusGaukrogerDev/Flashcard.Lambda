@@ -24,7 +24,7 @@ public class DeckTests
         {
             var deck = Deck.Create(ValidName, ValidUserId);
 
-            deck.UserId.ShouldBe(ValidUserId);
+            deck.UserId.Value.ShouldBe(ValidUserId);
         }
 
         [Fact]
@@ -195,7 +195,7 @@ public class DeckTests
 
             deck.Update("French Nouns", null);
 
-            deck.UserId.ShouldBe(ValidUserId);
+            deck.UserId.Value.ShouldBe(ValidUserId);
         }
     }
 
@@ -213,7 +213,7 @@ public class DeckTests
             deck.Name.ShouldBe(ValidName);
             deck.Description.ShouldBe(ValidDescription);
             deck.CreatedAt.ShouldBe(createdAt);
-            deck.UserId.ShouldBe(ValidUserId);
+            deck.UserId.Value.ShouldBe(ValidUserId);
         }
 
         [Fact]

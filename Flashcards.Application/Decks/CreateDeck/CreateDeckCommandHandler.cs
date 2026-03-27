@@ -1,14 +1,15 @@
 using Flashcards.Domain.Decks;
+using Flashcards.Application.Abstractions.Commands;
 
 namespace Flashcards.Application.Decks.CreateDeck;
 
-public class CreateDeckCommandHandler
+public class CreateDeckCommandHandler : ICommandHandler<CreateDeckCommand, CreateDeckResponse>
 {
-    private readonly IDeckRepository _deckRepository;
+    private readonly IDeckWriteRepository _deckWriteRepository;
 
-    public CreateDeckCommandHandler(IDeckRepository deckRepository)
+    public CreateDeckCommandHandler(IDeckWriteRepository deckWriteRepository)
     {
-        _deckRepository = deckRepository;
+        _deckWriteRepository = deckWriteRepository;
     }
 
     public async Task<CreateDeckResponse> HandleAsync(
@@ -17,7 +18,7 @@ public class CreateDeckCommandHandler
     {
         var deck = Deck.Create(command.Name, command.UserId, command.Description);
 
-        await _deckRepository.SaveAsync(deck, cancellationToken);
+        await _deckWriteRepository.SaveAsync(deck, cancellationToken);
 
         return new CreateDeckResponse(deck.Id.Value, deck.Name, deck.CreatedAt);
     }

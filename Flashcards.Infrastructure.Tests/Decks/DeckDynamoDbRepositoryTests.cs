@@ -167,7 +167,7 @@ public class DeckDynamoDbRepositoryTests
             result.ShouldNotBeNull();
             result.Id.Value.ToString().ShouldBe(deckId);
             result.Name.ShouldBe("Spanish Verbs");
-            result.UserId.ShouldBe(UserId);
+            result.UserId.Value.ShouldBe(UserId);
             result.CreatedAt.ShouldBe(createdAt);
         }
 
@@ -317,10 +317,6 @@ public class DeckDynamoDbRepositoryTests
             var (_, nextToken) = await _sut.GetByUserIdAsync(UserId);
 
             nextToken.ShouldNotBeNull();
-            var json = Encoding.UTF8.GetString(Convert.FromBase64String(nextToken));
-            var decoded = JsonSerializer.Deserialize<Dictionary<string, string>>(json)!;
-            decoded["Id"].ShouldBe("some-deck-id");
-            decoded["UserId"].ShouldBe(UserId);
         }
 
         [Fact]
@@ -336,18 +332,22 @@ public class DeckDynamoDbRepositoryTests
         [Fact]
         public async Task GetByUserIdAsync_WithPaginationToken_SetsExclusiveStartKey()
         {
-            var lastKey = new Dictionary<string, string>
+            var lastKey = new Dictionary<string, AttributeValue>
             {
-                ["Id"] = "some-deck-id",
-                ["UserId"] = UserId
+                ["Id"] = new() { S = "some-deck-id" },
+                ["UserId"] = new() { S = UserId }
             };
-            var token = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(lastKey)));
 
             QueryRequest? captured = null;
+            _dynamoDb.QueryAsync(Arg.Any<QueryRequest>(), Arg.Any<CancellationToken>())
+                .Returns(new QueryResponse { Items = new(), LastEvaluatedKey = lastKey });
+
+            var (_, token) = await _sut.GetByUserIdAsync(UserId);
+
             _dynamoDb.QueryAsync(Arg.Do<QueryRequest>(r => captured = r), Arg.Any<CancellationToken>())
                 .Returns(new QueryResponse { Items = new() });
 
-            await _sut.GetByUserIdAsync(UserId, paginationToken: token);
+            await _sut.GetByUserIdAsync(UserId, paginationToken: token!);
 
             captured!.ExclusiveStartKey["Id"].S.ShouldBe("some-deck-id");
             captured!.ExclusiveStartKey["UserId"].S.ShouldBe(UserId);

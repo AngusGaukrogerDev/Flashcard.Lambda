@@ -202,7 +202,7 @@ public class CardDynamoDbRepositoryTests
             result.FrontText.ShouldBe("Hola");
             result.BackText.ShouldBe("Hello");
             result.DeckId.ShouldBe(DeckId);
-            result.UserId.ShouldBe(UserId);
+            result.UserId.Value.ShouldBe(UserId);
             result.CreatedAt.ShouldBe(createdAt);
         }
 
@@ -344,7 +344,7 @@ public class CardDynamoDbRepositoryTests
 
             var result = await _sut.GetByDeckIdAsync(DeckId);
 
-            result.Count.ShouldBe(2);
+            result.Cards.Count.ShouldBe(2);
         }
 
         [Fact]
@@ -363,11 +363,11 @@ public class CardDynamoDbRepositoryTests
 
             var result = await _sut.GetByDeckIdAsync(DeckId);
 
-            result[0].Id.Value.ToString().ShouldBe(cardId);
-            result[0].FrontText.ShouldBe("Hola");
-            result[0].BackText.ShouldBe("Hello");
-            result[0].DeckId.ShouldBe(DeckId);
-            result[0].CreatedAt.ShouldBe(createdAt);
+            result.Cards[0].Id.Value.ToString().ShouldBe(cardId);
+            result.Cards[0].FrontText.ShouldBe("Hola");
+            result.Cards[0].BackText.ShouldBe("Hello");
+            result.Cards[0].DeckId.ShouldBe(DeckId);
+            result.Cards[0].CreatedAt.ShouldBe(createdAt);
         }
 
         [Fact]
@@ -378,7 +378,7 @@ public class CardDynamoDbRepositoryTests
 
             var result = await _sut.GetByDeckIdAsync(DeckId);
 
-            result.ShouldBeEmpty();
+            result.Cards.ShouldBeEmpty();
         }
 
         [Fact]

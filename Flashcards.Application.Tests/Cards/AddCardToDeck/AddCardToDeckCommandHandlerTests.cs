@@ -124,7 +124,7 @@ public class AddCardToDeckCommandHandlerTests
         await _sut.HandleAsync(command);
 
         await _cardRepository.Received(1).SaveAsync(
-            Arg.Is<Card>(c => c.UserId == UserId),
+            Arg.Is<Card>(c => c.UserId.Value == UserId),
             Arg.Any<CancellationToken>());
     }
 

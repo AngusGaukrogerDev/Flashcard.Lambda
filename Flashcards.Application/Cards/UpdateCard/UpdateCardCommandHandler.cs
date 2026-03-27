@@ -1,24 +1,32 @@
 using Flashcards.Domain.Cards;
+using Flashcards.Application.Abstractions.Commands;
 
 namespace Flashcards.Application.Cards.UpdateCard;
 
-public class UpdateCardCommandHandler
+public class UpdateCardCommandHandler : ICommandHandler<UpdateCardCommand, UpdateCardResponse>
 {
-    private readonly ICardRepository _cardRepository;
+    private readonly ICardReadRepository _cardReadRepository;
+    private readonly ICardWriteRepository _cardWriteRepository;
+
+    public UpdateCardCommandHandler(ICardReadRepository cardReadRepository, ICardWriteRepository cardWriteRepository)
+    {
+        _cardReadRepository = cardReadRepository;
+        _cardWriteRepository = cardWriteRepository;
+    }
 
     public UpdateCardCommandHandler(ICardRepository cardRepository)
+        : this(cardRepository, cardRepository)
     {
-        _cardRepository = cardRepository;
     }
 
     public async Task<UpdateCardResponse> HandleAsync(
         UpdateCardCommand command,
         CancellationToken cancellationToken = default)
     {
-        var card = await _cardRepository.GetByIdAsync(command.CardId, cancellationToken)
+        var card = await _cardReadRepository.GetByIdAsync(command.CardId, cancellationToken)
             ?? throw new CardNotFoundException(command.CardId);
 
-        if (card.UserId != command.UserId)
+        if (card.UserId.Value != command.UserId)
             throw new UnauthorisedCardAccessException(command.CardId);
 
         card.Update(
@@ -29,7 +37,7 @@ public class UpdateCardCommandHandler
             command.BackgroundColour,
             command.TextColour);
 
-        await _cardRepository.SaveAsync(card, cancellationToken);
+        await _cardWriteRepository.SaveAsync(card, cancellationToken);
 
         return new UpdateCardResponse(
             card.Id.Value,

@@ -1,13 +1,18 @@
 namespace Flashcards.Domain.Cards;
 
+using Flashcards.Domain.Users;
+
 public class Card
 {
+    public const int MaxTextLength = 10000;
+    public const int MaxPromptLength = 2000;
+
     private Card(
         CardId id,
         string frontText,
         string backText,
         string deckId,
-        string userId,
+        UserId userId,
         DateTime createdAt,
         DateTime? nextReviewDate,
         string? frontPrompt,
@@ -32,7 +37,7 @@ public class Card
     public string FrontText { get; private set; }
     public string BackText { get; private set; }
     public string DeckId { get; }
-    public string UserId { get; }
+    public UserId UserId { get; }
     public DateTime CreatedAt { get; }
     public DateTime? NextReviewDate { get; private set; }
     public string? FrontPrompt { get; private set; }
@@ -59,19 +64,33 @@ public class Card
         if (string.IsNullOrWhiteSpace(deckId))
             throw new ArgumentException("Deck ID cannot be empty.", nameof(deckId));
 
-        if (string.IsNullOrWhiteSpace(userId))
-            throw new ArgumentException("User ID cannot be empty.", nameof(userId));
+        var trimmedFrontText = frontText.Trim();
+        var trimmedBackText = backText.Trim();
+        var trimmedFrontPrompt = frontPrompt?.Trim();
+        var trimmedBackPrompt = backPrompt?.Trim();
+
+        if (trimmedFrontText.Length > MaxTextLength)
+            throw new ArgumentException($"Front text cannot exceed {MaxTextLength} characters.", nameof(frontText));
+
+        if (trimmedBackText.Length > MaxTextLength)
+            throw new ArgumentException($"Back text cannot exceed {MaxTextLength} characters.", nameof(backText));
+
+        if (trimmedFrontPrompt is not null && trimmedFrontPrompt.Length > MaxPromptLength)
+            throw new ArgumentException($"Front prompt cannot exceed {MaxPromptLength} characters.", nameof(frontPrompt));
+
+        if (trimmedBackPrompt is not null && trimmedBackPrompt.Length > MaxPromptLength)
+            throw new ArgumentException($"Back prompt cannot exceed {MaxPromptLength} characters.", nameof(backPrompt));
 
         return new Card(
             CardId.New(),
-            frontText.Trim(),
-            backText.Trim(),
+            trimmedFrontText,
+            trimmedBackText,
             deckId,
-            userId,
+            UserId.From(userId),
             DateTime.UtcNow,
             null,
-            frontPrompt?.Trim(),
-            backPrompt?.Trim(),
+            trimmedFrontPrompt,
+            trimmedBackPrompt,
             backgroundColour,
             textColour);
     }
@@ -88,7 +107,7 @@ public class Card
         string? backPrompt = null,
         CardColour? backgroundColour = null,
         TextColour? textColour = null)
-        => new(id, frontText, backText, deckId, userId, createdAt, nextReviewDate, frontPrompt, backPrompt, backgroundColour, textColour);
+        => new(id, frontText, backText, deckId, UserId.From(userId), createdAt, nextReviewDate, frontPrompt, backPrompt, backgroundColour, textColour);
 
     public void Update(
         string frontText,
@@ -104,10 +123,27 @@ public class Card
         if (string.IsNullOrWhiteSpace(backText))
             throw new ArgumentException("Back text cannot be empty.", nameof(backText));
 
-        FrontText = frontText.Trim();
-        BackText = backText.Trim();
-        FrontPrompt = frontPrompt?.Trim();
-        BackPrompt = backPrompt?.Trim();
+        var trimmedFrontText = frontText.Trim();
+        var trimmedBackText = backText.Trim();
+        var trimmedFrontPrompt = frontPrompt?.Trim();
+        var trimmedBackPrompt = backPrompt?.Trim();
+
+        if (trimmedFrontText.Length > MaxTextLength)
+            throw new ArgumentException($"Front text cannot exceed {MaxTextLength} characters.", nameof(frontText));
+
+        if (trimmedBackText.Length > MaxTextLength)
+            throw new ArgumentException($"Back text cannot exceed {MaxTextLength} characters.", nameof(backText));
+
+        if (trimmedFrontPrompt is not null && trimmedFrontPrompt.Length > MaxPromptLength)
+            throw new ArgumentException($"Front prompt cannot exceed {MaxPromptLength} characters.", nameof(frontPrompt));
+
+        if (trimmedBackPrompt is not null && trimmedBackPrompt.Length > MaxPromptLength)
+            throw new ArgumentException($"Back prompt cannot exceed {MaxPromptLength} characters.", nameof(backPrompt));
+
+        FrontText = trimmedFrontText;
+        BackText = trimmedBackText;
+        FrontPrompt = trimmedFrontPrompt;
+        BackPrompt = trimmedBackPrompt;
         BackgroundColour = backgroundColour;
         TextColour = textColour;
     }

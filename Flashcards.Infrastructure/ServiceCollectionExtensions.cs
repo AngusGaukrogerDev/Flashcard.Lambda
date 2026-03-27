@@ -17,11 +17,13 @@ public static class ServiceCollectionExtensions
     {
         services.TryAddSingleton<IAmazonDynamoDB>(_ => new AmazonDynamoDBClient());
 
-        services.AddScoped<IDeckRepository>(sp =>
+        services.AddScoped<DeckDynamoDbRepository>(sp =>
         {
             var dynamoDb = sp.GetRequiredService<IAmazonDynamoDB>();
             return new DeckDynamoDbRepository(dynamoDb, deckTableName, userIdIndexName);
         });
+        services.AddScoped<IDeckReadRepository>(sp => sp.GetRequiredService<DeckDynamoDbRepository>());
+        services.AddScoped<IDeckWriteRepository>(sp => sp.GetRequiredService<DeckDynamoDbRepository>());
 
         return services;
     }
@@ -33,11 +35,13 @@ public static class ServiceCollectionExtensions
     {
         services.TryAddSingleton<IAmazonDynamoDB>(_ => new AmazonDynamoDBClient());
 
-        services.AddScoped<ICardRepository>(sp =>
+        services.AddScoped<CardDynamoDbRepository>(sp =>
         {
             var dynamoDb = sp.GetRequiredService<IAmazonDynamoDB>();
             return new CardDynamoDbRepository(dynamoDb, cardTableName, cardDeckIdIndexName);
         });
+        services.AddScoped<ICardReadRepository>(sp => sp.GetRequiredService<CardDynamoDbRepository>());
+        services.AddScoped<ICardWriteRepository>(sp => sp.GetRequiredService<CardDynamoDbRepository>());
 
         return services;
     }

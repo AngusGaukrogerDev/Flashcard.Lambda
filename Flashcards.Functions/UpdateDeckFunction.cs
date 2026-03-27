@@ -2,22 +2,26 @@ using System.Net;
 using System.Text.Json;
 using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
+using Flashcards.Application.Abstractions.Commands;
 using Flashcards.Application.Decks.UpdateDeck;
 using Flashcards.Domain.Decks;
-using Flashcards.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Flashcards.Functions;
 
 public class UpdateDeckFunction
 {
-    private readonly UpdateDeckCommandHandler _handler;
+    private readonly ICommandHandler<UpdateDeckCommand, UpdateDeckResponse> _handler;
 
-    public UpdateDeckFunction() : this(BuildServiceProvider()) { }
+    public UpdateDeckFunction() : this(FunctionServiceProviderFactory.BuildDeckOnly(services =>
+    {
+        services.AddScoped<UpdateDeckCommandHandler>();
+        services.AddScoped<ICommandHandler<UpdateDeckCommand, UpdateDeckResponse>>(sp => sp.GetRequiredService<UpdateDeckCommandHandler>());
+    })) { }
 
     internal UpdateDeckFunction(IServiceProvider serviceProvider)
     {
-        _handler = serviceProvider.GetRequiredService<UpdateDeckCommandHandler>();
+        _handler = serviceProvider.GetRequiredService<ICommandHandler<UpdateDeckCommand, UpdateDeckResponse>>();
     }
 
     public async Task<APIGatewayHttpApiV2ProxyResponse> FunctionHandler(
@@ -26,79 +30,48 @@ public class UpdateDeckFunction
     {
         try
         {
-            var claims = request.RequestContext?.Authorizer?.Jwt?.Claims;
-            var userId = claims is not null && claims.TryGetValue("sub", out var sub) ? sub : null;
+            var userId = LambdaRequestAuth.TryGetUserId(request);
 
             if (string.IsNullOrEmpty(userId))
-                return ErrorResponse(HttpStatusCode.Unauthorized, "Unauthorised.");
+                return ApiResponses.Error(HttpStatusCode.Unauthorized, "Unauthorised.");
 
             string? deckId = null;
             request.PathParameters?.TryGetValue("deckId", out deckId);
 
             if (string.IsNullOrEmpty(deckId))
-                return ErrorResponse(HttpStatusCode.BadRequest, "Deck ID is required.");
+                return ApiResponses.Error(HttpStatusCode.BadRequest, "Deck ID is required.");
 
             var body = JsonSerializer.Deserialize<UpdateDeckRequestBody>(
                 request.Body ?? string.Empty,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                JsonDefaults.ReadOptions);
 
             if (body is null)
-                return ErrorResponse(HttpStatusCode.BadRequest, "Request body is required.");
+                return ApiResponses.Error(HttpStatusCode.BadRequest, "Request body is required.");
 
             var command = new UpdateDeckCommand(deckId, userId, body.Name, body.Description);
             var response = await _handler.HandleAsync(command);
 
-            return new APIGatewayHttpApiV2ProxyResponse
-            {
-                StatusCode = (int)HttpStatusCode.OK,
-                Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } },
-                Body = JsonSerializer.Serialize(response, new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                })
-            };
+            return ApiResponses.Json(HttpStatusCode.OK, response);
         }
-        catch (DeckNotFoundException ex)
+        catch (DeckNotFoundException)
         {
-            return ErrorResponse(HttpStatusCode.NotFound, ex.Message);
+            return ApiResponses.Error(HttpStatusCode.NotFound, "Deck not found.");
         }
         catch (UnauthorisedDeckAccessException)
         {
-            return ErrorResponse(HttpStatusCode.Forbidden, "You do not have permission to update this deck.");
+            return ApiResponses.Error(HttpStatusCode.NotFound, "Deck not found.");
         }
         catch (ArgumentException ex)
         {
-            return ErrorResponse(HttpStatusCode.BadRequest, ex.Message);
+            return ApiResponses.Error(HttpStatusCode.BadRequest, ex.Message);
         }
         catch (Exception ex)
         {
             context.Logger.LogError($"Unhandled error updating deck: {ex}");
-            return ErrorResponse(HttpStatusCode.InternalServerError, "An unexpected error occurred.");
+            return ApiResponses.Error(HttpStatusCode.InternalServerError, "An unexpected error occurred.");
         }
     }
 
-    private static APIGatewayHttpApiV2ProxyResponse ErrorResponse(HttpStatusCode statusCode, string message)
-        => new()
-        {
-            StatusCode = (int)statusCode,
-            Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } },
-            Body = JsonSerializer.Serialize(new { error = message })
-        };
-
     private record UpdateDeckRequestBody(string Name, string? Description);
 
-    private static IServiceProvider BuildServiceProvider()
-    {
-        var deckTableName = Environment.GetEnvironmentVariable("DECK_TABLE_NAME")
-            ?? throw new InvalidOperationException("Environment variable 'DECK_TABLE_NAME' is not set.");
-
-        var userIdIndexName = Environment.GetEnvironmentVariable("DECK_USER_ID_INDEX_NAME")
-            ?? throw new InvalidOperationException("Environment variable 'DECK_USER_ID_INDEX_NAME' is not set.");
-
-        var services = new ServiceCollection();
-        services.AddInfrastructure(deckTableName, userIdIndexName);
-        services.AddScoped<UpdateDeckCommandHandler>();
-
-        return services.BuildServiceProvider();
-    }
 }

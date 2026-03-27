@@ -71,7 +71,7 @@ public class CreateDeckCommandHandlerTests
         await _sut.HandleAsync(command);
 
         await _deckRepository.Received(1).SaveAsync(
-            Arg.Is<Deck>(d => d.UserId == UserId),
+            Arg.Is<Deck>(d => d.UserId.Value == UserId),
             Arg.Any<CancellationToken>());
     }
 

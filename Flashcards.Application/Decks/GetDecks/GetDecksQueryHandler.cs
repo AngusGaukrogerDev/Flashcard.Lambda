@@ -1,21 +1,22 @@
 using Flashcards.Application.Decks;
+using Flashcards.Application.Abstractions.Queries;
 
 namespace Flashcards.Application.Decks.GetDecks;
 
-public class GetDecksQueryHandler
+public class GetDecksQueryHandler : IQueryHandler<GetDecksQuery, GetDecksResponse>
 {
-    private readonly IDeckRepository _deckRepository;
+    private readonly IDeckReadRepository _deckReadRepository;
 
-    public GetDecksQueryHandler(IDeckRepository deckRepository)
+    public GetDecksQueryHandler(IDeckReadRepository deckReadRepository)
     {
-        _deckRepository = deckRepository;
+        _deckReadRepository = deckReadRepository;
     }
 
     public async Task<GetDecksResponse> HandleAsync(
         GetDecksQuery query,
         CancellationToken cancellationToken = default)
     {
-        var (decks, nextToken) = await _deckRepository.GetByUserIdAsync(
+        var (decks, nextToken) = await _deckReadRepository.GetByUserIdAsync(
             query.UserId,
             query.PageSize,
             query.PaginationToken,

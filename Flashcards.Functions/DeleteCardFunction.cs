@@ -1,23 +1,26 @@
 using System.Net;
-using System.Text.Json;
 using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
+using Flashcards.Application.Abstractions.Commands;
 using Flashcards.Application.Cards.DeleteCard;
 using Flashcards.Domain.Cards;
-using Flashcards.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Flashcards.Functions;
 
 public class DeleteCardFunction
 {
-    private readonly DeleteCardCommandHandler _handler;
+    private readonly ICommandHandler<DeleteCardCommand> _handler;
 
-    public DeleteCardFunction() : this(BuildServiceProvider()) { }
+    public DeleteCardFunction() : this(FunctionServiceProviderFactory.BuildCardOnly(services =>
+    {
+        services.AddScoped<DeleteCardCommandHandler>();
+        services.AddScoped<ICommandHandler<DeleteCardCommand>>(sp => sp.GetRequiredService<DeleteCardCommandHandler>());
+    })) { }
 
     internal DeleteCardFunction(IServiceProvider serviceProvider)
     {
-        _handler = serviceProvider.GetRequiredService<DeleteCardCommandHandler>();
+        _handler = serviceProvider.GetRequiredService<ICommandHandler<DeleteCardCommand>>();
     }
 
     public async Task<APIGatewayHttpApiV2ProxyResponse> FunctionHandler(
@@ -26,59 +29,34 @@ public class DeleteCardFunction
     {
         try
         {
-            var claims = request.RequestContext?.Authorizer?.Jwt?.Claims;
-            var userId = claims is not null && claims.TryGetValue("sub", out var sub) ? sub : null;
+            var userId = LambdaRequestAuth.TryGetUserId(request);
 
             if (string.IsNullOrEmpty(userId))
-                return ErrorResponse(HttpStatusCode.Unauthorized, "Unauthorised.");
+                return ApiResponses.Error(HttpStatusCode.Unauthorized, "Unauthorised.");
 
             string? cardId = null;
             request.PathParameters?.TryGetValue("cardId", out cardId);
 
             if (string.IsNullOrEmpty(cardId))
-                return ErrorResponse(HttpStatusCode.BadRequest, "Card ID is required.");
+                return ApiResponses.Error(HttpStatusCode.BadRequest, "Card ID is required.");
 
             var command = new DeleteCardCommand(cardId, userId);
             await _handler.HandleAsync(command);
 
-            return new APIGatewayHttpApiV2ProxyResponse
-            {
-                StatusCode = (int)HttpStatusCode.NoContent,
-                Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } }
-            };
+            return ApiResponses.NoContent();
         }
-        catch (CardNotFoundException ex)
+        catch (CardNotFoundException)
         {
-            return ErrorResponse(HttpStatusCode.NotFound, ex.Message);
+            return ApiResponses.Error(HttpStatusCode.NotFound, "Card not found.");
         }
         catch (UnauthorisedCardAccessException)
         {
-            return ErrorResponse(HttpStatusCode.Forbidden, "You do not have permission to delete this card.");
+            return ApiResponses.Error(HttpStatusCode.NotFound, "Card not found.");
         }
         catch (Exception ex)
         {
             context.Logger.LogError($"Unhandled error deleting card: {ex}");
-            return ErrorResponse(HttpStatusCode.InternalServerError, "An unexpected error occurred.");
+            return ApiResponses.Error(HttpStatusCode.InternalServerError, "An unexpected error occurred.");
         }
-    }
-
-    private static APIGatewayHttpApiV2ProxyResponse ErrorResponse(HttpStatusCode statusCode, string message)
-        => new()
-        {
-            StatusCode = (int)statusCode,
-            Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } },
-            Body = JsonSerializer.Serialize(new { error = message })
-        };
-
-    private static IServiceProvider BuildServiceProvider()
-    {
-        var cardTableName = Environment.GetEnvironmentVariable("CARD_TABLE_NAME")
-            ?? throw new InvalidOperationException("Environment variable 'CARD_TABLE_NAME' is not set.");
-
-        var services = new ServiceCollection();
-        services.AddCardInfrastructure(cardTableName);
-        services.AddScoped<DeleteCardCommandHandler>();
-
-        return services.BuildServiceProvider();
     }
 }

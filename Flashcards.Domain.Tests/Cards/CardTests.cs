@@ -41,7 +41,7 @@ public class CardTests
         {
             var card = Card.Create(ValidFrontText, ValidBackText, ValidDeckId, ValidUserId);
 
-            card.UserId.ShouldBe(ValidUserId);
+            card.UserId.Value.ShouldBe(ValidUserId);
         }
 
         [Fact]
@@ -297,7 +297,7 @@ public class CardTests
             card.FrontText.ShouldBe(ValidFrontText);
             card.BackText.ShouldBe(ValidBackText);
             card.DeckId.ShouldBe(ValidDeckId);
-            card.UserId.ShouldBe(ValidUserId);
+            card.UserId.Value.ShouldBe(ValidUserId);
             card.CreatedAt.ShouldBe(createdAt);
             card.NextReviewDate.ShouldBe(nextReviewDate);
             card.FrontPrompt.ShouldBe("Think about a greeting");

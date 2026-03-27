@@ -10,12 +10,16 @@ public class CardDynamoDbRepository : ICardRepository
     private readonly IAmazonDynamoDB _dynamoDb;
     private readonly string _tableName;
     private readonly string? _deckIdIndexName;
+    private readonly PaginationTokenCodec? _paginationTokenCodec;
 
     public CardDynamoDbRepository(IAmazonDynamoDB dynamoDb, string tableName, string? deckIdIndexName = null)
     {
         _dynamoDb = dynamoDb;
         _tableName = tableName;
         _deckIdIndexName = deckIdIndexName;
+        _paginationTokenCodec = deckIdIndexName is null
+            ? null
+            : new PaginationTokenCodec($"{tableName}:{deckIdIndexName}");
     }
 
     public async Task SaveAsync(Card card, CancellationToken cancellationToken = default)
@@ -26,7 +30,7 @@ public class CardDynamoDbRepository : ICardRepository
             ["FrontText"] = new() { S = card.FrontText },
             ["BackText"] = new() { S = card.BackText },
             ["DeckId"] = new() { S = card.DeckId },
-            ["UserId"] = new() { S = card.UserId },
+            ["UserId"] = new() { S = card.UserId.Value },
             ["CreatedAt"] = new() { S = card.CreatedAt.ToString("O") }
         };
 
@@ -70,7 +74,11 @@ public class CardDynamoDbRepository : ICardRepository
         return response.Item?.Count > 0 ? MapToCard(response.Item) : null;
     }
 
-    public async Task<IReadOnlyList<Card>> GetByDeckIdAsync(string deckId, CancellationToken cancellationToken = default)
+    public async Task<(IReadOnlyList<Card> Cards, string? NextPaginationToken)> GetByDeckIdAsync(
+        string deckId,
+        int? pageSize = null,
+        string? paginationToken = null,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(_deckIdIndexName))
             throw new InvalidOperationException("DeckId index name is not configured.");
@@ -86,9 +94,25 @@ public class CardDynamoDbRepository : ICardRepository
             }
         };
 
+        if (pageSize.HasValue)
+            request.Limit = pageSize.Value;
+
+        if (paginationToken is not null)
+        {
+            if (_paginationTokenCodec is null)
+                throw new InvalidOperationException("Pagination token codec is not configured.");
+
+            request.ExclusiveStartKey = _paginationTokenCodec.Deserialize(paginationToken);
+        }
+
         var response = await _dynamoDb.QueryAsync(request, cancellationToken);
 
-        return response.Items.Select(MapToCard).ToList();
+        var cards = response.Items.Select(MapToCard).ToList();
+        var nextToken = response.LastEvaluatedKey?.Count > 0 && _paginationTokenCodec is not null
+            ? _paginationTokenCodec.Serialize(response.LastEvaluatedKey)
+            : null;
+
+        return (cards, nextToken);
     }
 
     public async Task DeleteAsync(string cardId, CancellationToken cancellationToken = default)

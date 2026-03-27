@@ -1,28 +1,34 @@
 using Flashcards.Application.Decks;
+using Flashcards.Application.Abstractions.Commands;
 using Flashcards.Domain.Cards;
 using Flashcards.Domain.Decks;
 
 namespace Flashcards.Application.Cards.AddCardToDeck;
 
-public class AddCardToDeckCommandHandler
+public class AddCardToDeckCommandHandler : ICommandHandler<AddCardToDeckCommand, AddCardToDeckResponse>
 {
-    private readonly ICardRepository _cardRepository;
-    private readonly IDeckRepository _deckRepository;
+    private readonly ICardWriteRepository _cardWriteRepository;
+    private readonly IDeckReadRepository _deckReadRepository;
+
+    public AddCardToDeckCommandHandler(ICardWriteRepository cardWriteRepository, IDeckReadRepository deckReadRepository)
+    {
+        _cardWriteRepository = cardWriteRepository;
+        _deckReadRepository = deckReadRepository;
+    }
 
     public AddCardToDeckCommandHandler(ICardRepository cardRepository, IDeckRepository deckRepository)
+        : this((ICardWriteRepository)cardRepository, (IDeckReadRepository)deckRepository)
     {
-        _cardRepository = cardRepository;
-        _deckRepository = deckRepository;
     }
 
     public async Task<AddCardToDeckResponse> HandleAsync(
         AddCardToDeckCommand command,
         CancellationToken cancellationToken = default)
     {
-        var deck = await _deckRepository.GetByIdAsync(command.DeckId, cancellationToken)
+        var deck = await _deckReadRepository.GetByIdAsync(command.DeckId, cancellationToken)
             ?? throw new DeckNotFoundException(command.DeckId);
 
-        if (deck.UserId != command.UserId)
+        if (deck.UserId.Value != command.UserId)
             throw new UnauthorisedDeckAccessException(command.DeckId);
 
         var card = Card.Create(
@@ -35,7 +41,7 @@ public class AddCardToDeckCommandHandler
             command.BackgroundColour,
             command.TextColour);
 
-        await _cardRepository.SaveAsync(card, cancellationToken);
+        await _cardWriteRepository.SaveAsync(card, cancellationToken);
 
         return new AddCardToDeckResponse(
             card.Id.Value,

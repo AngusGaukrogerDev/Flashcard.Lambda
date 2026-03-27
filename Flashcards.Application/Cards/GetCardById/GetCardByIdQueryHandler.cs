@@ -1,24 +1,25 @@
 using Flashcards.Domain.Cards;
+using Flashcards.Application.Abstractions.Queries;
 
 namespace Flashcards.Application.Cards.GetCardById;
 
-public class GetCardByIdQueryHandler
+public class GetCardByIdQueryHandler : IQueryHandler<GetCardByIdQuery, GetCardByIdResponse>
 {
-    private readonly ICardRepository _cardRepository;
+    private readonly ICardReadRepository _cardReadRepository;
 
-    public GetCardByIdQueryHandler(ICardRepository cardRepository)
+    public GetCardByIdQueryHandler(ICardReadRepository cardReadRepository)
     {
-        _cardRepository = cardRepository;
+        _cardReadRepository = cardReadRepository;
     }
 
     public async Task<GetCardByIdResponse> HandleAsync(
         GetCardByIdQuery query,
         CancellationToken cancellationToken = default)
     {
-        var card = await _cardRepository.GetByIdAsync(query.CardId, cancellationToken)
+        var card = await _cardReadRepository.GetByIdAsync(query.CardId, cancellationToken)
             ?? throw new CardNotFoundException(query.CardId);
 
-        if (card.UserId != query.UserId)
+        if (card.UserId.Value != query.UserId)
             throw new UnauthorisedCardAccessException(query.CardId);
 
         return new GetCardByIdResponse(

@@ -1,8 +1,13 @@
 namespace Flashcards.Domain.Decks;
 
+using Flashcards.Domain.Users;
+
 public class Deck
 {
-    private Deck(DeckId id, string name, string? description, DateTime createdAt, string userId)
+    public const int MaxNameLength = 200;
+    public const int MaxDescriptionLength = 2000;
+
+    private Deck(DeckId id, string name, string? description, DateTime createdAt, UserId userId)
     {
         Id = id;
         Name = name;
@@ -15,28 +20,43 @@ public class Deck
     public string Name { get; private set; }
     public string? Description { get; private set; }
     public DateTime CreatedAt { get; }
-    public string UserId { get; }
+    public UserId UserId { get; }
 
     public static Deck Create(string name, string userId, string? description = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Deck name cannot be empty.", nameof(name));
 
-        if (string.IsNullOrWhiteSpace(userId))
-            throw new ArgumentException("User ID cannot be empty.", nameof(userId));
+        var trimmedName = name.Trim();
+        var trimmedDescription = description?.Trim();
 
-        return new Deck(DeckId.New(), name.Trim(), description?.Trim(), DateTime.UtcNow, userId);
+        if (trimmedName.Length > MaxNameLength)
+            throw new ArgumentException($"Deck name cannot exceed {MaxNameLength} characters.", nameof(name));
+
+        if (trimmedDescription is not null && trimmedDescription.Length > MaxDescriptionLength)
+            throw new ArgumentException($"Deck description cannot exceed {MaxDescriptionLength} characters.", nameof(description));
+
+        return new Deck(DeckId.New(), trimmedName, trimmedDescription, DateTime.UtcNow, UserId.From(userId));
     }
 
     public static Deck Reconstitute(DeckId id, string name, string? description, DateTime createdAt, string userId)
-        => new(id, name, description, createdAt, userId);
+        => new(id, name, description, createdAt, UserId.From(userId));
 
     public void Update(string name, string? description)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Deck name cannot be empty.", nameof(name));
 
-        Name = name.Trim();
-        Description = description?.Trim();
+        var trimmedName = name.Trim();
+        var trimmedDescription = description?.Trim();
+
+        if (trimmedName.Length > MaxNameLength)
+            throw new ArgumentException($"Deck name cannot exceed {MaxNameLength} characters.", nameof(name));
+
+        if (trimmedDescription is not null && trimmedDescription.Length > MaxDescriptionLength)
+            throw new ArgumentException($"Deck description cannot exceed {MaxDescriptionLength} characters.", nameof(description));
+
+        Name = trimmedName;
+        Description = trimmedDescription;
     }
 }
