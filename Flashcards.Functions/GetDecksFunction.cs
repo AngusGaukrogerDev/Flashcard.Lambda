@@ -2,21 +2,21 @@ using System.Net;
 using System.Text.Json;
 using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
-using Flashcards.Application.Decks.CreateDeck;
+using Flashcards.Application.Decks.GetDecks;
 using Flashcards.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Flashcards.Functions;
 
-public class CreateDeckFunction
+public class GetDecksFunction
 {
-    private readonly CreateDeckCommandHandler _handler;
+    private readonly GetDecksQueryHandler _handler;
 
-    public CreateDeckFunction() : this(BuildServiceProvider()) { }
+    public GetDecksFunction() : this(BuildServiceProvider()) { }
 
-    internal CreateDeckFunction(IServiceProvider serviceProvider)
+    internal GetDecksFunction(IServiceProvider serviceProvider)
     {
-        _handler = serviceProvider.GetRequiredService<CreateDeckCommandHandler>();
+        _handler = serviceProvider.GetRequiredService<GetDecksQueryHandler>();
     }
 
     public async Task<APIGatewayHttpApiV2ProxyResponse> FunctionHandler(
@@ -31,31 +31,34 @@ public class CreateDeckFunction
             if (string.IsNullOrEmpty(userId))
                 return ErrorResponse(HttpStatusCode.Unauthorized, "Unauthorised.");
 
-            var body = JsonSerializer.Deserialize<CreateDeckRequestBody>(
-                request.Body ?? string.Empty,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var queryParams = request.QueryStringParameters;
 
-            if (body is null)
-                return ErrorResponse(HttpStatusCode.BadRequest, "Request body is required.");
+            string? pageSizeRaw = null;
+            string? paginationToken = null;
 
-            var command = new CreateDeckCommand(body.Name, body.Description, userId);
+            queryParams?.TryGetValue("pageSize", out pageSizeRaw);
+            queryParams?.TryGetValue("paginationToken", out paginationToken);
 
-            var response = await _handler.HandleAsync(command);
+            int? pageSize = pageSizeRaw is not null && int.TryParse(pageSizeRaw, out var parsed) && parsed > 0
+                ? parsed
+                : null;
+
+            var query = new GetDecksQuery(userId, pageSize, paginationToken);
+            var response = await _handler.HandleAsync(query);
 
             return new APIGatewayHttpApiV2ProxyResponse
             {
-                StatusCode = (int)HttpStatusCode.Created,
+                StatusCode = (int)HttpStatusCode.OK,
                 Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } },
-                Body = JsonSerializer.Serialize(response)
+                Body = JsonSerializer.Serialize(response, new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                })
             };
-        }
-        catch (ArgumentException ex)
-        {
-            return ErrorResponse(HttpStatusCode.BadRequest, ex.Message);
         }
         catch (Exception ex)
         {
-            context.Logger.LogError($"Unhandled error creating deck: {ex}");
+            context.Logger.LogError($"Unhandled error retrieving decks: {ex}");
             return ErrorResponse(HttpStatusCode.InternalServerError, "An unexpected error occurred.");
         }
     }
@@ -68,8 +71,6 @@ public class CreateDeckFunction
             Body = JsonSerializer.Serialize(new { error = message })
         };
 
-    private record CreateDeckRequestBody(string Name, string? Description);
-
     private static IServiceProvider BuildServiceProvider()
     {
         var deckTableName = Environment.GetEnvironmentVariable("DECK_TABLE_NAME")
@@ -80,7 +81,7 @@ public class CreateDeckFunction
 
         var services = new ServiceCollection();
         services.AddInfrastructure(deckTableName, userIdIndexName);
-        services.AddScoped<CreateDeckCommandHandler>();
+        services.AddScoped<GetDecksQueryHandler>();
 
         return services.BuildServiceProvider();
     }

@@ -9,14 +9,15 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
-        string deckTableName)
+        string deckTableName,
+        string userIdIndexName)
     {
         services.AddSingleton<IAmazonDynamoDB>(_ => new AmazonDynamoDBClient());
 
         services.AddScoped<IDeckRepository>(sp =>
         {
             var dynamoDb = sp.GetRequiredService<IAmazonDynamoDB>();
-            return new DeckDynamoDbRepository(dynamoDb, deckTableName);
+            return new DeckDynamoDbRepository(dynamoDb, deckTableName, userIdIndexName);
         });
 
         return services;
