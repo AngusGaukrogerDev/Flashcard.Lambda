@@ -1,3 +1,5 @@
+using Flashcards.Domain.Cards;
+
 namespace Flashcards.Application.Cards.GetCardsByDeck;
 
 public record CardSummary(
@@ -5,4 +7,8 @@ public record CardSummary(
     string FrontText,
     string BackText,
     DateTime CreatedAt,
-    DateTime? NextReviewDate);
+    DateTime? NextReviewDate,
+    string? FrontPrompt,
+    string? BackPrompt,
+    CardColour? BackgroundColour,
+    TextColour? TextColour);

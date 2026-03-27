@@ -21,7 +21,13 @@ public class UpdateCardCommandHandler
         if (card.UserId != command.UserId)
             throw new UnauthorisedCardAccessException(command.CardId);
 
-        card.Update(command.FrontText, command.BackText);
+        card.Update(
+            command.FrontText,
+            command.BackText,
+            command.FrontPrompt,
+            command.BackPrompt,
+            command.BackgroundColour,
+            command.TextColour);
 
         await _cardRepository.SaveAsync(card, cancellationToken);
 
@@ -31,6 +37,10 @@ public class UpdateCardCommandHandler
             card.BackText,
             card.DeckId,
             card.CreatedAt,
-            card.NextReviewDate);
+            card.NextReviewDate,
+            card.FrontPrompt,
+            card.BackPrompt,
+            card.BackgroundColour,
+            card.TextColour);
     }
 }

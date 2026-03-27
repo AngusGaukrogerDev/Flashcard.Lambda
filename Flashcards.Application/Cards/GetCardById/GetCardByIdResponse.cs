@@ -1,3 +1,5 @@
+using Flashcards.Domain.Cards;
+
 namespace Flashcards.Application.Cards.GetCardById;
 
 public record GetCardByIdResponse(
@@ -6,4 +8,8 @@ public record GetCardByIdResponse(
     string BackText,
     string DeckId,
     DateTime CreatedAt,
-    DateTime? NextReviewDate);
+    DateTime? NextReviewDate,
+    string? FrontPrompt,
+    string? BackPrompt,
+    CardColour? BackgroundColour,
+    TextColour? TextColour);

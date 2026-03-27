@@ -27,6 +27,10 @@ public class GetCardByIdQueryHandler
             card.BackText,
             card.DeckId,
             card.CreatedAt,
-            card.NextReviewDate);
+            card.NextReviewDate,
+            card.FrontPrompt,
+            card.BackPrompt,
+            card.BackgroundColour,
+            card.TextColour);
     }
 }

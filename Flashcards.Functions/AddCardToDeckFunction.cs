@@ -1,8 +1,10 @@
 using System.Net;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
 using Flashcards.Application.Cards.AddCardToDeck;
+using Flashcards.Domain.Cards;
 using Flashcards.Domain.Decks;
 using Flashcards.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
@@ -40,12 +42,16 @@ public class AddCardToDeckFunction
 
             var body = JsonSerializer.Deserialize<AddCardRequestBody>(
                 request.Body ?? string.Empty,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    Converters = { new JsonStringEnumConverter() }
+                });
 
             if (body is null)
                 return ErrorResponse(HttpStatusCode.BadRequest, "Request body is required.");
 
-            var command = new AddCardToDeckCommand(body.FrontText, body.BackText, deckId, userId);
+            var command = new AddCardToDeckCommand(body.FrontText, body.BackText, deckId, userId, body.FrontPrompt, body.BackPrompt, body.BackgroundColour, body.TextColour);
             var response = await _handler.HandleAsync(command);
 
             return new APIGatewayHttpApiV2ProxyResponse
@@ -54,7 +60,8 @@ public class AddCardToDeckFunction
                 Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } },
                 Body = JsonSerializer.Serialize(response, new JsonSerializerOptions
                 {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
                 })
             };
         }
@@ -85,7 +92,13 @@ public class AddCardToDeckFunction
             Body = JsonSerializer.Serialize(new { error = message })
         };
 
-    private record AddCardRequestBody(string FrontText, string BackText);
+    private record AddCardRequestBody(
+        string FrontText,
+        string BackText,
+        string? FrontPrompt = null,
+        string? BackPrompt = null,
+        CardColour? BackgroundColour = null,
+        TextColour? TextColour = null);
 
     private static IServiceProvider BuildServiceProvider()
     {

@@ -33,6 +33,18 @@ public class CardDynamoDbRepository : ICardRepository
         if (card.NextReviewDate.HasValue)
             item["NextReviewDate"] = new AttributeValue { S = card.NextReviewDate.Value.ToString("O") };
 
+        if (card.FrontPrompt is not null)
+            item["FrontPrompt"] = new AttributeValue { S = card.FrontPrompt };
+
+        if (card.BackPrompt is not null)
+            item["BackPrompt"] = new AttributeValue { S = card.BackPrompt };
+
+        if (card.BackgroundColour.HasValue)
+            item["BackgroundColour"] = new AttributeValue { S = card.BackgroundColour.Value.ToString() };
+
+        if (card.TextColour.HasValue)
+            item["TextColour"] = new AttributeValue { S = card.TextColour.Value.ToString() };
+
         var request = new PutItemRequest
         {
             TableName = _tableName,
@@ -99,6 +111,17 @@ public class CardDynamoDbRepository : ICardRepository
             ? DateTime.Parse(nrd.S, null, System.Globalization.DateTimeStyles.RoundtripKind)
             : null;
 
+        string? frontPrompt = item.TryGetValue("FrontPrompt", out var fp) ? fp.S : null;
+        string? backPrompt = item.TryGetValue("BackPrompt", out var bp) ? bp.S : null;
+
+        CardColour? backgroundColour = item.TryGetValue("BackgroundColour", out var bc)
+            ? Enum.Parse<CardColour>(bc.S)
+            : null;
+
+        TextColour? textColour = item.TryGetValue("TextColour", out var tc)
+            ? Enum.Parse<TextColour>(tc.S)
+            : null;
+
         return Card.Reconstitute(
             CardId.From(Guid.Parse(item["Id"].S)),
             item["FrontText"].S,
@@ -106,6 +129,10 @@ public class CardDynamoDbRepository : ICardRepository
             item["DeckId"].S,
             item["UserId"].S,
             DateTime.Parse(item["CreatedAt"].S, null, System.Globalization.DateTimeStyles.RoundtripKind),
-            nextReviewDate);
+            nextReviewDate,
+            frontPrompt,
+            backPrompt,
+            backgroundColour,
+            textColour);
     }
 }

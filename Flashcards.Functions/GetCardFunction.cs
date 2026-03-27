@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
 using Flashcards.Application.Cards.GetCardById;
@@ -47,7 +48,8 @@ public class GetCardFunction
                 Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } },
                 Body = JsonSerializer.Serialize(response, new JsonSerializerOptions
                 {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
                 })
             };
         }

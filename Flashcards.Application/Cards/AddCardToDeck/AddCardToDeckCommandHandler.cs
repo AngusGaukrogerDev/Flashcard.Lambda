@@ -25,10 +25,27 @@ public class AddCardToDeckCommandHandler
         if (deck.UserId != command.UserId)
             throw new UnauthorisedDeckAccessException(command.DeckId);
 
-        var card = Card.Create(command.FrontText, command.BackText, command.DeckId, command.UserId);
+        var card = Card.Create(
+            command.FrontText,
+            command.BackText,
+            command.DeckId,
+            command.UserId,
+            command.FrontPrompt,
+            command.BackPrompt,
+            command.BackgroundColour,
+            command.TextColour);
 
         await _cardRepository.SaveAsync(card, cancellationToken);
 
-        return new AddCardToDeckResponse(card.Id.Value, card.FrontText, card.BackText, card.DeckId, card.CreatedAt);
+        return new AddCardToDeckResponse(
+            card.Id.Value,
+            card.FrontText,
+            card.BackText,
+            card.DeckId,
+            card.CreatedAt,
+            card.FrontPrompt,
+            card.BackPrompt,
+            card.BackgroundColour,
+            card.TextColour);
     }
 }

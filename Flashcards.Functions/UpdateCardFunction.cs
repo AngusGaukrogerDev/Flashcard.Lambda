@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
 using Flashcards.Application.Cards.UpdateCard;
@@ -40,12 +41,16 @@ public class UpdateCardFunction
 
             var body = JsonSerializer.Deserialize<UpdateCardRequestBody>(
                 request.Body ?? string.Empty,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    Converters = { new JsonStringEnumConverter() }
+                });
 
             if (body is null)
                 return ErrorResponse(HttpStatusCode.BadRequest, "Request body is required.");
 
-            var command = new UpdateCardCommand(cardId, userId, body.FrontText, body.BackText);
+            var command = new UpdateCardCommand(cardId, userId, body.FrontText, body.BackText, body.FrontPrompt, body.BackPrompt, body.BackgroundColour, body.TextColour);
             var response = await _handler.HandleAsync(command);
 
             return new APIGatewayHttpApiV2ProxyResponse
@@ -54,7 +59,8 @@ public class UpdateCardFunction
                 Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } },
                 Body = JsonSerializer.Serialize(response, new JsonSerializerOptions
                 {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
                 })
             };
         }
@@ -85,7 +91,13 @@ public class UpdateCardFunction
             Body = JsonSerializer.Serialize(new { error = message })
         };
 
-    private record UpdateCardRequestBody(string FrontText, string BackText);
+    private record UpdateCardRequestBody(
+        string FrontText,
+        string BackText,
+        string? FrontPrompt = null,
+        string? BackPrompt = null,
+        CardColour? BackgroundColour = null,
+        TextColour? TextColour = null);
 
     private static IServiceProvider BuildServiceProvider()
     {

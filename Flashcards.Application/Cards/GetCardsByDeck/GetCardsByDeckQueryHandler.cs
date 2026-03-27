@@ -27,7 +27,7 @@ public class GetCardsByDeckQueryHandler
         var cards = await _cardRepository.GetByDeckIdAsync(query.DeckId, cancellationToken);
 
         var summaries = cards
-            .Select(c => new CardSummary(c.Id.Value, c.FrontText, c.BackText, c.CreatedAt, c.NextReviewDate))
+            .Select(c => new CardSummary(c.Id.Value, c.FrontText, c.BackText, c.CreatedAt, c.NextReviewDate, c.FrontPrompt, c.BackPrompt, c.BackgroundColour, c.TextColour))
             .ToList();
 
         return new GetCardsByDeckResponse(query.DeckId, summaries);

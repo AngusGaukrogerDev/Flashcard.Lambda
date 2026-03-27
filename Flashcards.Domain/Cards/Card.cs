@@ -2,7 +2,18 @@ namespace Flashcards.Domain.Cards;
 
 public class Card
 {
-    private Card(CardId id, string frontText, string backText, string deckId, string userId, DateTime createdAt, DateTime? nextReviewDate)
+    private Card(
+        CardId id,
+        string frontText,
+        string backText,
+        string deckId,
+        string userId,
+        DateTime createdAt,
+        DateTime? nextReviewDate,
+        string? frontPrompt,
+        string? backPrompt,
+        CardColour? backgroundColour,
+        TextColour? textColour)
     {
         Id = id;
         FrontText = frontText;
@@ -11,6 +22,10 @@ public class Card
         UserId = userId;
         CreatedAt = createdAt;
         NextReviewDate = nextReviewDate;
+        FrontPrompt = frontPrompt;
+        BackPrompt = backPrompt;
+        BackgroundColour = backgroundColour;
+        TextColour = textColour;
     }
 
     public CardId Id { get; }
@@ -20,8 +35,20 @@ public class Card
     public string UserId { get; }
     public DateTime CreatedAt { get; }
     public DateTime? NextReviewDate { get; private set; }
+    public string? FrontPrompt { get; private set; }
+    public string? BackPrompt { get; private set; }
+    public CardColour? BackgroundColour { get; private set; }
+    public TextColour? TextColour { get; private set; }
 
-    public static Card Create(string frontText, string backText, string deckId, string userId)
+    public static Card Create(
+        string frontText,
+        string backText,
+        string deckId,
+        string userId,
+        string? frontPrompt = null,
+        string? backPrompt = null,
+        CardColour? backgroundColour = null,
+        TextColour? textColour = null)
     {
         if (string.IsNullOrWhiteSpace(frontText))
             throw new ArgumentException("Front text cannot be empty.", nameof(frontText));
@@ -35,13 +62,41 @@ public class Card
         if (string.IsNullOrWhiteSpace(userId))
             throw new ArgumentException("User ID cannot be empty.", nameof(userId));
 
-        return new Card(CardId.New(), frontText.Trim(), backText.Trim(), deckId, userId, DateTime.UtcNow, null);
+        return new Card(
+            CardId.New(),
+            frontText.Trim(),
+            backText.Trim(),
+            deckId,
+            userId,
+            DateTime.UtcNow,
+            null,
+            frontPrompt?.Trim(),
+            backPrompt?.Trim(),
+            backgroundColour,
+            textColour);
     }
 
-    public static Card Reconstitute(CardId id, string frontText, string backText, string deckId, string userId, DateTime createdAt, DateTime? nextReviewDate)
-        => new(id, frontText, backText, deckId, userId, createdAt, nextReviewDate);
+    public static Card Reconstitute(
+        CardId id,
+        string frontText,
+        string backText,
+        string deckId,
+        string userId,
+        DateTime createdAt,
+        DateTime? nextReviewDate,
+        string? frontPrompt = null,
+        string? backPrompt = null,
+        CardColour? backgroundColour = null,
+        TextColour? textColour = null)
+        => new(id, frontText, backText, deckId, userId, createdAt, nextReviewDate, frontPrompt, backPrompt, backgroundColour, textColour);
 
-    public void Update(string frontText, string backText)
+    public void Update(
+        string frontText,
+        string backText,
+        string? frontPrompt = null,
+        string? backPrompt = null,
+        CardColour? backgroundColour = null,
+        TextColour? textColour = null)
     {
         if (string.IsNullOrWhiteSpace(frontText))
             throw new ArgumentException("Front text cannot be empty.", nameof(frontText));
@@ -51,5 +106,9 @@ public class Card
 
         FrontText = frontText.Trim();
         BackText = backText.Trim();
+        FrontPrompt = frontPrompt?.Trim();
+        BackPrompt = backPrompt?.Trim();
+        BackgroundColour = backgroundColour;
+        TextColour = textColour;
     }
 }
