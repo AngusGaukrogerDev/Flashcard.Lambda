@@ -1,6 +1,7 @@
-using Flashcards.Domain.Cards;
+using Flashcards.Application.Cards;
 using Flashcards.Application.DeckTags;
 using Flashcards.Application.Abstractions.Commands;
+using Flashcards.Domain.Cards;
 
 namespace Flashcards.Application.Cards.UpdateCard;
 
@@ -52,17 +53,6 @@ public class UpdateCardCommandHandler : ICommandHandler<UpdateCardCommand, Updat
 
         await _cardWriteRepository.SaveAsync(card, cancellationToken);
 
-        return new UpdateCardResponse(
-            card.Id.Value,
-            card.FrontText,
-            card.BackText,
-            card.DeckId,
-            card.CreatedAt,
-            card.NextReviewDate,
-            card.FrontPrompt,
-            card.BackPrompt,
-            card.BackgroundColour,
-            card.TextColour,
-            card.TagIds);
+        return CardPresentationMapper.ToUpdateCardResponse(card);
     }
 }

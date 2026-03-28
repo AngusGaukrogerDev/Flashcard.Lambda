@@ -1,8 +1,8 @@
 using Flashcards.Domain.Cards;
 
-namespace Flashcards.Application.Cards.GetCardsByDeck;
+namespace Flashcards.Application.Cards.GetCardsForStudy;
 
-public record CardSummary(
+public record StudyCardItem(
     Guid Id,
     string FrontText,
     string BackText,
@@ -18,4 +18,5 @@ public record CardSummary(
     string? BackPrompt,
     CardColour? BackgroundColour,
     TextColour? TextColour,
-    IReadOnlyList<string> TagIds);
+    IReadOnlyList<string> TagIds,
+    bool IsDue);

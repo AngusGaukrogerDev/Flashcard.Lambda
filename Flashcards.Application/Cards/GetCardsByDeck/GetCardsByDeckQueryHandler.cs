@@ -1,3 +1,4 @@
+using Flashcards.Application.Cards;
 using Flashcards.Application.Decks;
 using Flashcards.Application.Abstractions.Queries;
 using Flashcards.Domain.Decks;
@@ -49,7 +50,7 @@ public class GetCardsByDeckQueryHandler : IQueryHandler<GetCardsByDeckQuery, Get
         }
 
         var summaries = cards
-            .Select(c => new CardSummary(c.Id.Value, c.FrontText, c.BackText, c.CreatedAt, c.NextReviewDate, c.FrontPrompt, c.BackPrompt, c.BackgroundColour, c.TextColour, c.TagIds))
+            .Select(CardPresentationMapper.ToSummary)
             .ToList();
 
         return new GetCardsByDeckResponse(query.DeckId, summaries, nextPaginationToken);

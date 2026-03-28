@@ -18,6 +18,11 @@ public class Card
         UserId userId,
         DateTime createdAt,
         DateTime? nextReviewDate,
+        double easeFactor,
+        double intervalDays,
+        int repetitionCount,
+        DateTime? lastReviewedAt,
+        RecallRating? lastRecallRating,
         string? frontPrompt,
         string? backPrompt,
         CardColour? backgroundColour,
@@ -31,6 +36,11 @@ public class Card
         UserId = userId;
         CreatedAt = createdAt;
         NextReviewDate = nextReviewDate;
+        EaseFactor = easeFactor;
+        IntervalDays = intervalDays;
+        RepetitionCount = repetitionCount;
+        LastReviewedAt = lastReviewedAt;
+        LastRecallRating = lastRecallRating;
         FrontPrompt = frontPrompt;
         BackPrompt = backPrompt;
         BackgroundColour = backgroundColour;
@@ -45,6 +55,11 @@ public class Card
     public UserId UserId { get; }
     public DateTime CreatedAt { get; }
     public DateTime? NextReviewDate { get; private set; }
+    public double EaseFactor { get; private set; }
+    public double IntervalDays { get; private set; }
+    public int RepetitionCount { get; private set; }
+    public DateTime? LastReviewedAt { get; private set; }
+    public RecallRating? LastRecallRating { get; private set; }
     public string? FrontPrompt { get; private set; }
     public string? BackPrompt { get; private set; }
     public CardColour? BackgroundColour { get; private set; }
@@ -97,6 +112,11 @@ public class Card
             UserId.From(userId),
             DateTime.UtcNow,
             null,
+            CardScheduling.DefaultEaseFactor,
+            0,
+            0,
+            null,
+            null,
             trimmedFrontPrompt,
             trimmedBackPrompt,
             backgroundColour,
@@ -116,8 +136,50 @@ public class Card
         string? backPrompt = null,
         CardColour? backgroundColour = null,
         TextColour? textColour = null,
-        IReadOnlyList<string>? tagIds = null)
-        => new(id, frontText, backText, deckId, UserId.From(userId), createdAt, nextReviewDate, frontPrompt, backPrompt, backgroundColour, textColour, tagIds);
+        IReadOnlyList<string>? tagIds = null,
+        double easeFactor = CardScheduling.DefaultEaseFactor,
+        double intervalDays = 0,
+        int repetitionCount = 0,
+        DateTime? lastReviewedAt = null,
+        RecallRating? lastRecallRating = null)
+        => new(
+            id,
+            frontText,
+            backText,
+            deckId,
+            UserId.From(userId),
+            createdAt,
+            nextReviewDate,
+            easeFactor,
+            intervalDays,
+            repetitionCount,
+            lastReviewedAt,
+            lastRecallRating,
+            frontPrompt,
+            backPrompt,
+            backgroundColour,
+            textColour,
+            tagIds);
+
+    public void ApplyRecallRating(RecallRating rating, DateTime reviewedAtUtc)
+    {
+        if (reviewedAtUtc.Kind != DateTimeKind.Utc)
+            reviewedAtUtc = reviewedAtUtc.ToUniversalTime();
+
+        var (ease, interval, reps, next) = CardScheduling.CalculateNext(
+            rating,
+            reviewedAtUtc,
+            EaseFactor,
+            IntervalDays,
+            RepetitionCount);
+
+        EaseFactor = ease;
+        IntervalDays = interval;
+        RepetitionCount = reps;
+        NextReviewDate = next;
+        LastReviewedAt = reviewedAtUtc;
+        LastRecallRating = rating;
+    }
 
     public void SetTagIds(IEnumerable<string> tagIds)
     {

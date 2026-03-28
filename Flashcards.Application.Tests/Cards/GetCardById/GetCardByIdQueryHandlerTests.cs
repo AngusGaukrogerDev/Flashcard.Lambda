@@ -92,6 +92,22 @@ public class GetCardByIdQueryHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_ReturnsDefaultSchedulingFields()
+    {
+        var cardId = CardId.New();
+        var card = Card.Reconstitute(cardId, "Hola", "Hello", "deck-1", UserId, DateTime.UtcNow, null);
+        _cardRepository.GetByIdAsync(cardId.ToString(), Arg.Any<CancellationToken>()).Returns(card);
+
+        var result = await _sut.HandleAsync(new GetCardByIdQuery(cardId.ToString(), UserId));
+
+        result.EaseFactor.ShouldBe(CardScheduling.DefaultEaseFactor);
+        result.IntervalDays.ShouldBe(0);
+        result.RepetitionCount.ShouldBe(0);
+        result.LastRecallRating.ShouldBeNull();
+        result.RecallTrafficLight.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task HandleAsync_WhenCardDoesNotExist_ThrowsCardNotFoundException()
     {
         _cardRepository.GetByIdAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((Card?)null);

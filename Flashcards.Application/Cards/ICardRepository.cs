@@ -24,6 +24,11 @@ public interface ICardReadRepository
         int? pageSize = null,
         string? paginationToken = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Loads every card in the deck (paginates internally). Used for study queue ordering.
+    /// </summary>
+    Task<IReadOnlyList<Card>> GetAllByDeckIdAsync(string deckId, CancellationToken cancellationToken = default);
 }
 
 public interface ICardRepository : ICardReadRepository, ICardWriteRepository;

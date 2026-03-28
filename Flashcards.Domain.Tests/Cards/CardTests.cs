@@ -72,6 +72,18 @@ public class CardTests
         }
 
         [Fact]
+        public void Create_WithValidInputs_SetsDefaultSchedulingState()
+        {
+            var card = Card.Create(ValidFrontText, ValidBackText, ValidDeckId, ValidUserId);
+
+            card.EaseFactor.ShouldBe(CardScheduling.DefaultEaseFactor);
+            card.IntervalDays.ShouldBe(0);
+            card.RepetitionCount.ShouldBe(0);
+            card.LastReviewedAt.ShouldBeNull();
+            card.LastRecallRating.ShouldBeNull();
+        }
+
+        [Fact]
         public void Create_WithNoOptionalFields_LeavesOptionalFieldsNull()
         {
             var card = Card.Create(ValidFrontText, ValidBackText, ValidDeckId, ValidUserId);

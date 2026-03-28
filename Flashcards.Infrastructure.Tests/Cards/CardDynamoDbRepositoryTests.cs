@@ -155,6 +155,23 @@ public class CardDynamoDbRepositoryTests
 
             captured!.Item.ShouldNotContainKey("NextReviewDate");
         }
+
+        [Fact]
+        public async Task SaveAsync_StoresSchedulingFields()
+        {
+            var card = Card.Create("Hola", "Hello", DeckId, UserId);
+            card.ApplyRecallRating(RecallRating.Medium, DateTime.UtcNow);
+            PutItemRequest? captured = null;
+            _dynamoDb.PutItemAsync(Arg.Do<PutItemRequest>(r => captured = r), Arg.Any<CancellationToken>())
+                .Returns(new PutItemResponse());
+
+            await _sut.SaveAsync(card);
+
+            captured!.Item.ShouldContainKey("EaseFactor");
+            captured.Item.ShouldContainKey("IntervalDays");
+            captured.Item.ShouldContainKey("RepetitionCount");
+            captured.Item.ShouldContainKey("LastRecallRating");
+        }
     }
 
     public class GetByIdAsyncTests : CardDynamoDbRepositoryTests
@@ -229,6 +246,25 @@ public class CardDynamoDbRepositoryTests
             var result = await _sut.GetByIdAsync(cardId);
 
             result!.NextReviewDate.ShouldBeNull();
+        }
+
+        [Fact]
+        public async Task GetByIdAsync_WhenItemHasSchedulingFields_ReturnsMappedCard()
+        {
+            var cardId = CardId.New().ToString();
+            var item = BuildCardItem(cardId, "Hola", "Hello", DeckId, UserId, DateTime.UtcNow);
+            item["EaseFactor"] = new AttributeValue { N = "2.5" };
+            item["IntervalDays"] = new AttributeValue { N = "1" };
+            item["RepetitionCount"] = new AttributeValue { N = "2" };
+            item["LastRecallRating"] = new AttributeValue { S = "Medium" };
+            SetupGetItemResponse(item);
+
+            var result = await _sut.GetByIdAsync(cardId);
+
+            result!.EaseFactor.ShouldBe(2.5);
+            result.IntervalDays.ShouldBe(1);
+            result.RepetitionCount.ShouldBe(2);
+            result.LastRecallRating.ShouldBe(RecallRating.Medium);
         }
 
         [Fact]
@@ -388,6 +424,27 @@ public class CardDynamoDbRepositoryTests
 
             await Should.ThrowAsync<InvalidOperationException>(() =>
                 repoWithoutIndex.GetByDeckIdAsync(DeckId));
+        }
+
+        [Fact]
+        public async Task GetAllByDeckIdAsync_ReturnsAllItemsFromSinglePage()
+        {
+            var cardId1 = CardId.New().ToString();
+            var cardId2 = CardId.New().ToString();
+            _dynamoDb.QueryAsync(Arg.Any<QueryRequest>(), Arg.Any<CancellationToken>())
+                .Returns(new QueryResponse
+                {
+                    Items = new List<Dictionary<string, AttributeValue>>
+                    {
+                        BuildCardItem(cardId1, "Hola", "Hello", DeckId, UserId, DateTime.UtcNow),
+                        BuildCardItem(cardId2, "Adios", "Goodbye", DeckId, UserId, DateTime.UtcNow)
+                    }
+                });
+
+            var result = await _sut.GetAllByDeckIdAsync(DeckId);
+
+            result.Count.ShouldBe(2);
+            await _dynamoDb.Received(1).QueryAsync(Arg.Any<QueryRequest>(), Arg.Any<CancellationToken>());
         }
     }
 

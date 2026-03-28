@@ -1,3 +1,4 @@
+using Flashcards.Application.Cards;
 using Flashcards.Application.Decks;
 using Flashcards.Application.DeckTags;
 using Flashcards.Application.Abstractions.Commands;
@@ -56,16 +57,6 @@ public class AddCardToDeckCommandHandler : ICommandHandler<AddCardToDeckCommand,
 
         await _cardWriteRepository.SaveAsync(card, cancellationToken);
 
-        return new AddCardToDeckResponse(
-            card.Id.Value,
-            card.FrontText,
-            card.BackText,
-            card.DeckId,
-            card.CreatedAt,
-            card.FrontPrompt,
-            card.BackPrompt,
-            card.BackgroundColour,
-            card.TextColour,
-            card.TagIds);
+        return CardPresentationMapper.ToAddCardToDeckResponse(card);
     }
 }

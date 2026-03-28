@@ -1,5 +1,6 @@
-using Flashcards.Domain.Cards;
 using Flashcards.Application.Abstractions.Queries;
+using Flashcards.Application.Cards;
+using Flashcards.Domain.Cards;
 
 namespace Flashcards.Application.Cards.GetCardById;
 
@@ -22,17 +23,6 @@ public class GetCardByIdQueryHandler : IQueryHandler<GetCardByIdQuery, GetCardBy
         if (card.UserId.Value != query.UserId)
             throw new UnauthorisedCardAccessException(query.CardId);
 
-        return new GetCardByIdResponse(
-            card.Id.Value,
-            card.FrontText,
-            card.BackText,
-            card.DeckId,
-            card.CreatedAt,
-            card.NextReviewDate,
-            card.FrontPrompt,
-            card.BackPrompt,
-            card.BackgroundColour,
-            card.TextColour,
-            card.TagIds);
+        return CardPresentationMapper.ToGetCardByIdResponse(card);
     }
 }

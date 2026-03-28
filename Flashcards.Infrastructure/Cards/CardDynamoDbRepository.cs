@@ -52,6 +52,16 @@ public class CardDynamoDbRepository : ICardRepository
         if (card.TagIds.Count > 0)
             item["TagIds"] = new AttributeValue { SS = card.TagIds.ToList() };
 
+        item["EaseFactor"] = new AttributeValue { N = card.EaseFactor.ToString(System.Globalization.CultureInfo.InvariantCulture) };
+        item["IntervalDays"] = new AttributeValue { N = card.IntervalDays.ToString(System.Globalization.CultureInfo.InvariantCulture) };
+        item["RepetitionCount"] = new AttributeValue { N = card.RepetitionCount.ToString(System.Globalization.CultureInfo.InvariantCulture) };
+
+        if (card.LastReviewedAt.HasValue)
+            item["LastReviewedAt"] = new AttributeValue { S = card.LastReviewedAt.Value.ToString("O") };
+
+        if (card.LastRecallRating.HasValue)
+            item["LastRecallRating"] = new AttributeValue { S = card.LastRecallRating.Value.ToString() };
+
         var request = new PutItemRequest
         {
             TableName = _tableName,
@@ -118,6 +128,20 @@ public class CardDynamoDbRepository : ICardRepository
         return (cards, nextToken);
     }
 
+    public async Task<IReadOnlyList<Card>> GetAllByDeckIdAsync(string deckId, CancellationToken cancellationToken = default)
+    {
+        var all = new List<Card>();
+        string? token = null;
+        do
+        {
+            var (cards, next) = await GetByDeckIdAsync(deckId, null, token, cancellationToken);
+            all.AddRange(cards);
+            token = next;
+        } while (token is not null);
+
+        return all;
+    }
+
     public async Task DeleteAsync(string cardId, CancellationToken cancellationToken = default)
     {
         var request = new DeleteItemRequest
@@ -153,6 +177,26 @@ public class CardDynamoDbRepository : ICardRepository
         if (item.TryGetValue("TagIds", out var tagAttr) && tagAttr.SS is { Count: > 0 })
             tagIds = tagAttr.SS.OrderBy(x => x, StringComparer.Ordinal).ToList();
 
+        var easeFactor = CardScheduling.DefaultEaseFactor;
+        if (item.TryGetValue("EaseFactor", out var ef) && ef.N is not null)
+            easeFactor = double.Parse(ef.N, System.Globalization.CultureInfo.InvariantCulture);
+
+        var intervalDays = 0d;
+        if (item.TryGetValue("IntervalDays", out var id) && id.N is not null)
+            intervalDays = double.Parse(id.N, System.Globalization.CultureInfo.InvariantCulture);
+
+        var repetitionCount = 0;
+        if (item.TryGetValue("RepetitionCount", out var rc) && rc.N is not null)
+            repetitionCount = int.Parse(rc.N, System.Globalization.CultureInfo.InvariantCulture);
+
+        DateTime? lastReviewedAt = item.TryGetValue("LastReviewedAt", out var lra)
+            ? DateTime.Parse(lra.S, null, System.Globalization.DateTimeStyles.RoundtripKind)
+            : null;
+
+        RecallRating? lastRecallRating = null;
+        if (item.TryGetValue("LastRecallRating", out var lrr) && lrr.S is not null)
+            lastRecallRating = Enum.Parse<RecallRating>(lrr.S, ignoreCase: true);
+
         return Card.Reconstitute(
             CardId.From(Guid.Parse(item["Id"].S)),
             item["FrontText"].S,
@@ -165,6 +209,11 @@ public class CardDynamoDbRepository : ICardRepository
             backPrompt,
             backgroundColour,
             textColour,
-            tagIds);
+            tagIds,
+            easeFactor,
+            intervalDays,
+            repetitionCount,
+            lastReviewedAt,
+            lastRecallRating);
     }
 }

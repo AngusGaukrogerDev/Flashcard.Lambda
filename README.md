@@ -38,6 +38,8 @@ Application → Domain
 | `GetCardFunction` | `GET /cards/{cardId}` | Get a card by ID |
 | `UpdateCardFunction` | `PUT /cards/{cardId}` | Update a card's front or back text |
 | `DeleteCardFunction` | `DELETE /cards/{cardId}` | Delete a card |
+| `ReviewCardFunction` | `POST /cards/{cardId}/review` | Submit a recall rating and update spaced-repetition scheduling |
+| `GetCardsForStudyFunction` | `GET /decks/{deckId}/cards/study` | Cards to study: due first, then soonest upcoming (query `limit`, max 50; default 20) |
 
 ## Authentication
 
@@ -67,7 +69,9 @@ All use cases follow a command/query pattern:
 | Command | `AddCardToDeckCommand` / `AddCardToDeckCommandHandler` | Add a card to a deck |
 | Command | `UpdateCardCommand` / `UpdateCardCommandHandler` | Update a card |
 | Command | `DeleteCardCommand` / `DeleteCardCommandHandler` | Delete a card |
+| Command | `ReviewCardCommand` / `ReviewCardCommandHandler` | Record recall (`incorrect`, `hard`, `medium`, `easy`) and reschedule |
 | Query | `GetCardByIdQuery` / `GetCardByIdQueryHandler` | Get a card by ID |
+| Query | `GetCardsForStudyQuery` / `GetCardsForStudyQueryHandler` | Study queue for a deck |
 
 ## Data Storage
 
@@ -97,7 +101,14 @@ Stored in a separate DynamoDB table with the following structure:
 | `FrontText` | String | |
 | `BackText` | String | |
 | `CreatedAt` | String (ISO 8601) | |
-| `NextReviewDate` | String (ISO 8601) | Optional — set by review logic |
+| `NextReviewDate` | String (ISO 8601) | Optional — set when the card is reviewed |
+| `EaseFactor` | Number | Spaced repetition ease (default 2.5 for new cards) |
+| `IntervalDays` | Number | Last computed interval in days |
+| `RepetitionCount` | Number | Successful review streak counter (resets on `incorrect`) |
+| `LastReviewedAt` | String (ISO 8601) | Optional |
+| `LastRecallRating` | String | Optional — `Incorrect`, `Hard`, `Medium`, or `Easy` (stored as enum name; API uses camelCase JSON) |
+
+Card API responses include `recallTrafficLight`: `red` \| `orange` \| `yellow` \| `green` mapped from the last recall rating (`null` if never reviewed).
 
 ### Environment variables
 
@@ -106,8 +117,9 @@ Stored in a separate DynamoDB table with the following structure:
 | `DECK_TABLE_NAME` | DynamoDB table name for decks |
 | `DECK_USER_ID_INDEX_NAME` | Name of the GSI on `UserId` for the decks table |
 | `CARD_TABLE_NAME` | DynamoDB table name for cards |
+| `CARD_DECK_ID_INDEX_NAME` | GSI on `DeckId` for listing cards in a deck |
 
-`AddCardToDeckFunction` requires all three variables. All other card functions require only `CARD_TABLE_NAME`. Deck functions require only `DECK_TABLE_NAME` and `DECK_USER_ID_INDEX_NAME`.
+`AddCardToDeckFunction`, `GetCardsByDeckFunction`, and `GetCardsForStudyFunction` require `DECK_TABLE_NAME`, `DECK_USER_ID_INDEX_NAME`, `DECK_TAG_TABLE_NAME`, `DECK_TAG_DECK_ID_INDEX_NAME`, `CARD_TABLE_NAME`, and `CARD_DECK_ID_INDEX_NAME`. Functions that only load a card by id (`GetCardFunction`, `UpdateCardFunction`, `DeleteCardFunction`, `ReviewCardFunction`) need only `CARD_TABLE_NAME`.
 
 ## Tech Stack
 
@@ -161,5 +173,19 @@ Replace the handler class name with the function you want to deploy. Available h
 | `GetCardFunction` | Get card by ID |
 | `UpdateCardFunction` | Update card |
 | `DeleteCardFunction` | Delete card |
+| `ReviewCardFunction` | Submit recall rating for a card |
+| `GetCardsForStudyFunction` | Study queue for a deck |
 
 `Flashcards.Functions/aws-lambda-tools-defaults.json` contains default deployment configuration (runtime `dotnet8`, 512 MB memory, 30 s timeout). Ensure your AWS profile and region are configured before deploying.
+
+Example (set profile/region as needed):
+
+```bash
+export AWS_PROFILE=your-profile
+export AWS_REGION=eu-west-2
+cd Flashcards.Functions
+dotnet lambda deploy-function --function-handler "Flashcards.Functions::Flashcards.Functions.ReviewCardFunction::FunctionHandler"
+dotnet lambda deploy-function --function-handler "Flashcards.Functions::Flashcards.Functions.GetCardsForStudyFunction::FunctionHandler"
+```
+
+Wire new routes in API Gateway HTTP API to these Lambdas (e.g. `POST /cards/{cardId}/review`, `GET /decks/{deckId}/cards/study`).
