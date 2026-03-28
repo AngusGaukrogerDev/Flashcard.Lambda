@@ -5,6 +5,7 @@ using Amazon.Lambda.Core;
 using Flashcards.Application.Abstractions.Commands;
 using Flashcards.Application.Cards.UpdateCard;
 using Flashcards.Domain.Cards;
+using Flashcards.Domain.DeckTags;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Flashcards.Functions;
@@ -13,7 +14,7 @@ public class UpdateCardFunction
 {
     private readonly ICommandHandler<UpdateCardCommand, UpdateCardResponse> _handler;
 
-    public UpdateCardFunction() : this(FunctionServiceProviderFactory.BuildCardOnly(services =>
+    public UpdateCardFunction() : this(FunctionServiceProviderFactory.BuildCardAndDeckTags(services =>
     {
         services.AddScoped<UpdateCardCommandHandler>();
         services.AddScoped<ICommandHandler<UpdateCardCommand, UpdateCardResponse>>(sp => sp.GetRequiredService<UpdateCardCommandHandler>());
@@ -48,7 +49,7 @@ public class UpdateCardFunction
             if (body is null)
                 return ApiResponses.Error(HttpStatusCode.BadRequest, "Request body is required.");
 
-            var command = new UpdateCardCommand(cardId, userId, body.FrontText, body.BackText, body.FrontPrompt, body.BackPrompt, body.BackgroundColour, body.TextColour);
+            var command = new UpdateCardCommand(cardId, userId, body.FrontText, body.BackText, body.FrontPrompt, body.BackPrompt, body.BackgroundColour, body.TextColour, body.TagIds);
             var response = await _handler.HandleAsync(command);
 
             return ApiResponses.Json(HttpStatusCode.OK, response);
@@ -60,6 +61,10 @@ public class UpdateCardFunction
         catch (UnauthorisedCardAccessException)
         {
             return ApiResponses.Error(HttpStatusCode.NotFound, "Card not found.");
+        }
+        catch (InvalidDeckTagForDeckException ex)
+        {
+            return ApiResponses.Error(HttpStatusCode.BadRequest, ex.Message);
         }
         catch (ArgumentException ex)
         {
@@ -78,6 +83,7 @@ public class UpdateCardFunction
         string? FrontPrompt = null,
         string? BackPrompt = null,
         CardColour? BackgroundColour = null,
-        TextColour? TextColour = null);
+        TextColour? TextColour = null,
+        IReadOnlyList<string>? TagIds = null);
 
 }

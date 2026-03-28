@@ -10,4 +10,5 @@ public record UpdateCardCommand(
     string? FrontPrompt = null,
     string? BackPrompt = null,
     CardColour? BackgroundColour = null,
-    TextColour? TextColour = null);
+    TextColour? TextColour = null,
+    IReadOnlyList<string>? TagIds = null);

@@ -49,7 +49,7 @@ public class GetCardsByDeckQueryHandler : IQueryHandler<GetCardsByDeckQuery, Get
         }
 
         var summaries = cards
-            .Select(c => new CardSummary(c.Id.Value, c.FrontText, c.BackText, c.CreatedAt, c.NextReviewDate, c.FrontPrompt, c.BackPrompt, c.BackgroundColour, c.TextColour))
+            .Select(c => new CardSummary(c.Id.Value, c.FrontText, c.BackText, c.CreatedAt, c.NextReviewDate, c.FrontPrompt, c.BackPrompt, c.BackgroundColour, c.TextColour, c.TagIds))
             .ToList();
 
         return new GetCardsByDeckResponse(query.DeckId, summaries, nextPaginationToken);

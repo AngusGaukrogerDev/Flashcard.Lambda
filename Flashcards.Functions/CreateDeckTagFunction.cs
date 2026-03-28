@@ -3,27 +3,25 @@ using System.Text.Json;
 using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
 using Flashcards.Application.Abstractions.Commands;
-using Flashcards.Application.Cards.AddCardToDeck;
-using Flashcards.Domain.Cards;
-using Flashcards.Domain.DeckTags;
+using Flashcards.Application.DeckTags.CreateDeckTag;
 using Flashcards.Domain.Decks;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Flashcards.Functions;
 
-public class AddCardToDeckFunction
+public class CreateDeckTagFunction
 {
-    private readonly ICommandHandler<AddCardToDeckCommand, AddCardToDeckResponse> _handler;
+    private readonly ICommandHandler<CreateDeckTagCommand, CreateDeckTagResponse> _handler;
 
-    public AddCardToDeckFunction() : this(FunctionServiceProviderFactory.BuildDeckAndCard(services =>
+    public CreateDeckTagFunction() : this(FunctionServiceProviderFactory.BuildDeckWithTags(services =>
     {
-        services.AddScoped<AddCardToDeckCommandHandler>();
-        services.AddScoped<ICommandHandler<AddCardToDeckCommand, AddCardToDeckResponse>>(sp => sp.GetRequiredService<AddCardToDeckCommandHandler>());
-    }, requireCardDeckIndex: false)) { }
+        services.AddScoped<CreateDeckTagCommandHandler>();
+        services.AddScoped<ICommandHandler<CreateDeckTagCommand, CreateDeckTagResponse>>(sp => sp.GetRequiredService<CreateDeckTagCommandHandler>());
+    })) { }
 
-    internal AddCardToDeckFunction(IServiceProvider serviceProvider)
+    internal CreateDeckTagFunction(IServiceProvider serviceProvider)
     {
-        _handler = serviceProvider.GetRequiredService<ICommandHandler<AddCardToDeckCommand, AddCardToDeckResponse>>();
+        _handler = serviceProvider.GetRequiredService<ICommandHandler<CreateDeckTagCommand, CreateDeckTagResponse>>();
     }
 
     public async Task<APIGatewayHttpApiV2ProxyResponse> FunctionHandler(
@@ -43,14 +41,14 @@ public class AddCardToDeckFunction
             if (string.IsNullOrEmpty(deckId))
                 return ApiResponses.Error(HttpStatusCode.BadRequest, "Deck ID is required.");
 
-            var body = JsonSerializer.Deserialize<AddCardRequestBody>(
+            var body = JsonSerializer.Deserialize<CreateDeckTagRequestBody>(
                 request.Body ?? string.Empty,
                 JsonDefaults.ReadOptions);
 
             if (body is null)
                 return ApiResponses.Error(HttpStatusCode.BadRequest, "Request body is required.");
 
-            var command = new AddCardToDeckCommand(body.FrontText, body.BackText, deckId, userId, body.FrontPrompt, body.BackPrompt, body.BackgroundColour, body.TextColour, body.TagIds);
+            var command = new CreateDeckTagCommand(deckId, userId, body.Name);
             var response = await _handler.HandleAsync(command);
 
             return ApiResponses.Json(HttpStatusCode.Created, response);
@@ -63,28 +61,16 @@ public class AddCardToDeckFunction
         {
             return ApiResponses.Error(HttpStatusCode.NotFound, "Deck not found.");
         }
-        catch (InvalidDeckTagForDeckException ex)
-        {
-            return ApiResponses.Error(HttpStatusCode.BadRequest, ex.Message);
-        }
         catch (ArgumentException ex)
         {
             return ApiResponses.Error(HttpStatusCode.BadRequest, ex.Message);
         }
         catch (Exception ex)
         {
-            context.Logger.LogError($"Unhandled error adding card to deck: {ex}");
+            context.Logger.LogError($"Unhandled error creating deck tag: {ex}");
             return ApiResponses.Error(HttpStatusCode.InternalServerError, "An unexpected error occurred.");
         }
     }
 
-    private record AddCardRequestBody(
-        string FrontText,
-        string BackText,
-        string? FrontPrompt = null,
-        string? BackPrompt = null,
-        CardColour? BackgroundColour = null,
-        TextColour? TextColour = null,
-        IReadOnlyList<string>? TagIds = null);
-
+    private record CreateDeckTagRequestBody(string Name);
 }

@@ -11,4 +11,5 @@ public record CardSummary(
     string? FrontPrompt,
     string? BackPrompt,
     CardColour? BackgroundColour,
-    TextColour? TextColour);
+    TextColour? TextColour,
+    IReadOnlyList<string> TagIds);

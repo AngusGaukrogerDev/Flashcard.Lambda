@@ -49,6 +49,9 @@ public class CardDynamoDbRepository : ICardRepository
         if (card.TextColour.HasValue)
             item["TextColour"] = new AttributeValue { S = card.TextColour.Value.ToString() };
 
+        if (card.TagIds.Count > 0)
+            item["TagIds"] = new AttributeValue { SS = card.TagIds.ToList() };
+
         var request = new PutItemRequest
         {
             TableName = _tableName,
@@ -146,6 +149,10 @@ public class CardDynamoDbRepository : ICardRepository
             ? Enum.Parse<TextColour>(tc.S)
             : null;
 
+        IReadOnlyList<string>? tagIds = null;
+        if (item.TryGetValue("TagIds", out var tagAttr) && tagAttr.SS is { Count: > 0 })
+            tagIds = tagAttr.SS.OrderBy(x => x, StringComparer.Ordinal).ToList();
+
         return Card.Reconstitute(
             CardId.From(Guid.Parse(item["Id"].S)),
             item["FrontText"].S,
@@ -157,6 +164,7 @@ public class CardDynamoDbRepository : ICardRepository
             frontPrompt,
             backPrompt,
             backgroundColour,
-            textColour);
+            textColour,
+            tagIds);
     }
 }

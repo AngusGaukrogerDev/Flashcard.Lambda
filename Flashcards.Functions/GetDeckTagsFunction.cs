@@ -1,26 +1,26 @@
 using System.Net;
 using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
-using Flashcards.Application.Abstractions.Commands;
-using Flashcards.Application.Decks.DeleteDeck;
+using Flashcards.Application.Abstractions.Queries;
+using Flashcards.Application.DeckTags.GetDeckTags;
 using Flashcards.Domain.Decks;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Flashcards.Functions;
 
-public class DeleteDeckFunction
+public class GetDeckTagsFunction
 {
-    private readonly ICommandHandler<DeleteDeckCommand> _handler;
+    private readonly IQueryHandler<GetDeckTagsQuery, GetDeckTagsResponse> _handler;
 
-    public DeleteDeckFunction() : this(FunctionServiceProviderFactory.BuildDeckWithTags(services =>
+    public GetDeckTagsFunction() : this(FunctionServiceProviderFactory.BuildDeckWithTags(services =>
     {
-        services.AddScoped<DeleteDeckCommandHandler>();
-        services.AddScoped<ICommandHandler<DeleteDeckCommand>>(sp => sp.GetRequiredService<DeleteDeckCommandHandler>());
+        services.AddScoped<GetDeckTagsQueryHandler>();
+        services.AddScoped<IQueryHandler<GetDeckTagsQuery, GetDeckTagsResponse>>(sp => sp.GetRequiredService<GetDeckTagsQueryHandler>());
     })) { }
 
-    internal DeleteDeckFunction(IServiceProvider serviceProvider)
+    internal GetDeckTagsFunction(IServiceProvider serviceProvider)
     {
-        _handler = serviceProvider.GetRequiredService<ICommandHandler<DeleteDeckCommand>>();
+        _handler = serviceProvider.GetRequiredService<IQueryHandler<GetDeckTagsQuery, GetDeckTagsResponse>>();
     }
 
     public async Task<APIGatewayHttpApiV2ProxyResponse> FunctionHandler(
@@ -40,10 +40,10 @@ public class DeleteDeckFunction
             if (string.IsNullOrEmpty(deckId))
                 return ApiResponses.Error(HttpStatusCode.BadRequest, "Deck ID is required.");
 
-            var command = new DeleteDeckCommand(deckId, userId);
-            await _handler.HandleAsync(command);
+            var query = new GetDeckTagsQuery(deckId, userId);
+            var response = await _handler.HandleAsync(query);
 
-            return ApiResponses.NoContent();
+            return ApiResponses.Json(HttpStatusCode.OK, response);
         }
         catch (DeckNotFoundException)
         {
@@ -55,7 +55,7 @@ public class DeleteDeckFunction
         }
         catch (Exception ex)
         {
-            context.Logger.LogError($"Unhandled error deleting deck: {ex}");
+            context.Logger.LogError($"Unhandled error listing deck tags: {ex}");
             return ApiResponses.Error(HttpStatusCode.InternalServerError, "An unexpected error occurred.");
         }
     }

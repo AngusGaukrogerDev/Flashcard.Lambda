@@ -1,5 +1,6 @@
 using Flashcards.Application.Decks;
 using Flashcards.Application.Decks.DeleteDeck;
+using Flashcards.Application.DeckTags;
 using Flashcards.Domain.Decks;
 using NSubstitute;
 using Shouldly;
@@ -12,12 +13,14 @@ public class DeleteDeckCommandHandlerTests
     private const string OtherUserId = "user-456";
 
     private readonly IDeckRepository _deckRepository;
+    private readonly IDeckTagWriteRepository _deckTagWriteRepository;
     private readonly DeleteDeckCommandHandler _sut;
 
     public DeleteDeckCommandHandlerTests()
     {
         _deckRepository = Substitute.For<IDeckRepository>();
-        _sut = new DeleteDeckCommandHandler(_deckRepository);
+        _deckTagWriteRepository = Substitute.For<IDeckTagWriteRepository>();
+        _sut = new DeleteDeckCommandHandler(_deckRepository, _deckTagWriteRepository);
     }
 
     [Fact]
@@ -30,6 +33,7 @@ public class DeleteDeckCommandHandlerTests
         var command = new DeleteDeckCommand(deckId.ToString(), UserId);
         await _sut.HandleAsync(command);
 
+        await _deckTagWriteRepository.Received(1).DeleteAllForDeckAsync(deckId.ToString(), Arg.Any<CancellationToken>());
         await _deckRepository.Received(1).DeleteAsync(deckId.ToString(), Arg.Any<CancellationToken>());
     }
 
@@ -66,6 +70,7 @@ public class DeleteDeckCommandHandlerTests
 
         await Should.ThrowAsync<UnauthorisedDeckAccessException>(() => _sut.HandleAsync(command));
 
+        await _deckTagWriteRepository.DidNotReceive().DeleteAllForDeckAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _deckRepository.DidNotReceive().DeleteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 

@@ -1,7 +1,9 @@
 using Flashcards.Application.Cards;
 using Flashcards.Application.Cards.AddCardToDeck;
 using Flashcards.Application.Decks;
+using Flashcards.Application.DeckTags;
 using Flashcards.Domain.Cards;
+using Flashcards.Domain.DeckTags;
 using Flashcards.Domain.Decks;
 using NSubstitute;
 using Shouldly;
@@ -15,13 +17,17 @@ public class AddCardToDeckCommandHandlerTests
 
     private readonly ICardRepository _cardRepository;
     private readonly IDeckRepository _deckRepository;
+    private readonly IDeckTagReadRepository _deckTagReadRepository;
     private readonly AddCardToDeckCommandHandler _sut;
 
     public AddCardToDeckCommandHandlerTests()
     {
         _cardRepository = Substitute.For<ICardRepository>();
         _deckRepository = Substitute.For<IDeckRepository>();
-        _sut = new AddCardToDeckCommandHandler(_cardRepository, _deckRepository);
+        _deckTagReadRepository = Substitute.For<IDeckTagReadRepository>();
+        _deckTagReadRepository.GetByDeckIdAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<DeckTag>());
+        _sut = new AddCardToDeckCommandHandler(_cardRepository, _deckRepository, _deckTagReadRepository);
     }
 
     [Fact]

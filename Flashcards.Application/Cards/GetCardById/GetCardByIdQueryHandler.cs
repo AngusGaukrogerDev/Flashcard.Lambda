@@ -32,6 +32,7 @@ public class GetCardByIdQueryHandler : IQueryHandler<GetCardByIdQuery, GetCardBy
             card.FrontPrompt,
             card.BackPrompt,
             card.BackgroundColour,
-            card.TextColour);
+            card.TextColour,
+            card.TagIds);
     }
 }

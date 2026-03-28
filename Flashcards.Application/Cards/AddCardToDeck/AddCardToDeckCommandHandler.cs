@@ -1,4 +1,5 @@
 using Flashcards.Application.Decks;
+using Flashcards.Application.DeckTags;
 using Flashcards.Application.Abstractions.Commands;
 using Flashcards.Domain.Cards;
 using Flashcards.Domain.Decks;
@@ -9,15 +10,20 @@ public class AddCardToDeckCommandHandler : ICommandHandler<AddCardToDeckCommand,
 {
     private readonly ICardWriteRepository _cardWriteRepository;
     private readonly IDeckReadRepository _deckReadRepository;
+    private readonly IDeckTagReadRepository _deckTagReadRepository;
 
-    public AddCardToDeckCommandHandler(ICardWriteRepository cardWriteRepository, IDeckReadRepository deckReadRepository)
+    public AddCardToDeckCommandHandler(
+        ICardWriteRepository cardWriteRepository,
+        IDeckReadRepository deckReadRepository,
+        IDeckTagReadRepository deckTagReadRepository)
     {
         _cardWriteRepository = cardWriteRepository;
         _deckReadRepository = deckReadRepository;
+        _deckTagReadRepository = deckTagReadRepository;
     }
 
-    public AddCardToDeckCommandHandler(ICardRepository cardRepository, IDeckRepository deckRepository)
-        : this((ICardWriteRepository)cardRepository, (IDeckReadRepository)deckRepository)
+    public AddCardToDeckCommandHandler(ICardRepository cardRepository, IDeckRepository deckRepository, IDeckTagReadRepository deckTagReadRepository)
+        : this((ICardWriteRepository)cardRepository, (IDeckReadRepository)deckRepository, deckTagReadRepository)
     {
     }
 
@@ -31,6 +37,12 @@ public class AddCardToDeckCommandHandler : ICommandHandler<AddCardToDeckCommand,
         if (deck.UserId.Value != command.UserId)
             throw new UnauthorisedDeckAccessException(command.DeckId);
 
+        if (command.TagIds is { Count: > 0 })
+        {
+            var deckTags = await _deckTagReadRepository.GetByDeckIdAsync(command.DeckId, cancellationToken);
+            DeckTagCardGuard.EnsureTagIdsBelongToDeck(command.DeckId, command.TagIds, deckTags);
+        }
+
         var card = Card.Create(
             command.FrontText,
             command.BackText,
@@ -39,7 +51,8 @@ public class AddCardToDeckCommandHandler : ICommandHandler<AddCardToDeckCommand,
             command.FrontPrompt,
             command.BackPrompt,
             command.BackgroundColour,
-            command.TextColour);
+            command.TextColour,
+            command.TagIds);
 
         await _cardWriteRepository.SaveAsync(card, cancellationToken);
 
@@ -52,6 +65,7 @@ public class AddCardToDeckCommandHandler : ICommandHandler<AddCardToDeckCommand,
             card.FrontPrompt,
             card.BackPrompt,
             card.BackgroundColour,
-            card.TextColour);
+            card.TextColour,
+            card.TagIds);
     }
 }

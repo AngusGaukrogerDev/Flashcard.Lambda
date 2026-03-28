@@ -1,4 +1,5 @@
 using Flashcards.Domain.Cards;
+using Flashcards.Application.DeckTags;
 using Flashcards.Application.Abstractions.Commands;
 
 namespace Flashcards.Application.Cards.UpdateCard;
@@ -7,15 +8,20 @@ public class UpdateCardCommandHandler : ICommandHandler<UpdateCardCommand, Updat
 {
     private readonly ICardReadRepository _cardReadRepository;
     private readonly ICardWriteRepository _cardWriteRepository;
+    private readonly IDeckTagReadRepository _deckTagReadRepository;
 
-    public UpdateCardCommandHandler(ICardReadRepository cardReadRepository, ICardWriteRepository cardWriteRepository)
+    public UpdateCardCommandHandler(
+        ICardReadRepository cardReadRepository,
+        ICardWriteRepository cardWriteRepository,
+        IDeckTagReadRepository deckTagReadRepository)
     {
         _cardReadRepository = cardReadRepository;
         _cardWriteRepository = cardWriteRepository;
+        _deckTagReadRepository = deckTagReadRepository;
     }
 
-    public UpdateCardCommandHandler(ICardRepository cardRepository)
-        : this(cardRepository, cardRepository)
+    public UpdateCardCommandHandler(ICardRepository cardRepository, IDeckTagReadRepository deckTagReadRepository)
+        : this(cardRepository, cardRepository, deckTagReadRepository)
     {
     }
 
@@ -37,6 +43,13 @@ public class UpdateCardCommandHandler : ICommandHandler<UpdateCardCommand, Updat
             command.BackgroundColour,
             command.TextColour);
 
+        if (command.TagIds is not null)
+        {
+            var deckTags = await _deckTagReadRepository.GetByDeckIdAsync(card.DeckId, cancellationToken);
+            DeckTagCardGuard.EnsureTagIdsBelongToDeck(card.DeckId, command.TagIds, deckTags);
+            card.SetTagIds(command.TagIds);
+        }
+
         await _cardWriteRepository.SaveAsync(card, cancellationToken);
 
         return new UpdateCardResponse(
@@ -49,6 +62,7 @@ public class UpdateCardCommandHandler : ICommandHandler<UpdateCardCommand, Updat
             card.FrontPrompt,
             card.BackPrompt,
             card.BackgroundColour,
-            card.TextColour);
+            card.TextColour,
+            card.TagIds);
     }
 }

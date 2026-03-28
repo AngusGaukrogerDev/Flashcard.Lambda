@@ -1,6 +1,8 @@
 using Flashcards.Application.Cards;
 using Flashcards.Application.Cards.UpdateCard;
+using Flashcards.Application.DeckTags;
 using Flashcards.Domain.Cards;
+using Flashcards.Domain.DeckTags;
 using NSubstitute;
 using Shouldly;
 
@@ -12,12 +14,16 @@ public class UpdateCardCommandHandlerTests
     private const string OtherUserId = "user-456";
 
     private readonly ICardRepository _cardRepository;
+    private readonly IDeckTagReadRepository _deckTagReadRepository;
     private readonly UpdateCardCommandHandler _sut;
 
     public UpdateCardCommandHandlerTests()
     {
         _cardRepository = Substitute.For<ICardRepository>();
-        _sut = new UpdateCardCommandHandler(_cardRepository);
+        _deckTagReadRepository = Substitute.For<IDeckTagReadRepository>();
+        _deckTagReadRepository.GetByDeckIdAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<DeckTag>());
+        _sut = new UpdateCardCommandHandler(_cardRepository, _deckTagReadRepository);
     }
 
     [Fact]

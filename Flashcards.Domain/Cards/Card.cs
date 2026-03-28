@@ -6,6 +6,9 @@ public class Card
 {
     public const int MaxTextLength = 10000;
     public const int MaxPromptLength = 2000;
+    public const int MaxTagsPerCard = 50;
+
+    private readonly List<string> _tagIds;
 
     private Card(
         CardId id,
@@ -18,7 +21,8 @@ public class Card
         string? frontPrompt,
         string? backPrompt,
         CardColour? backgroundColour,
-        TextColour? textColour)
+        TextColour? textColour,
+        IEnumerable<string>? tagIds)
     {
         Id = id;
         FrontText = frontText;
@@ -31,6 +35,7 @@ public class Card
         BackPrompt = backPrompt;
         BackgroundColour = backgroundColour;
         TextColour = textColour;
+        _tagIds = tagIds is null ? [] : NormalizeTagIds(tagIds);
     }
 
     public CardId Id { get; }
@@ -45,6 +50,8 @@ public class Card
     public CardColour? BackgroundColour { get; private set; }
     public TextColour? TextColour { get; private set; }
 
+    public IReadOnlyList<string> TagIds => _tagIds;
+
     public static Card Create(
         string frontText,
         string backText,
@@ -53,7 +60,8 @@ public class Card
         string? frontPrompt = null,
         string? backPrompt = null,
         CardColour? backgroundColour = null,
-        TextColour? textColour = null)
+        TextColour? textColour = null,
+        IEnumerable<string>? tagIds = null)
     {
         if (string.IsNullOrWhiteSpace(frontText))
             throw new ArgumentException("Front text cannot be empty.", nameof(frontText));
@@ -92,7 +100,8 @@ public class Card
             trimmedFrontPrompt,
             trimmedBackPrompt,
             backgroundColour,
-            textColour);
+            textColour,
+            tagIds);
     }
 
     public static Card Reconstitute(
@@ -106,8 +115,24 @@ public class Card
         string? frontPrompt = null,
         string? backPrompt = null,
         CardColour? backgroundColour = null,
-        TextColour? textColour = null)
-        => new(id, frontText, backText, deckId, UserId.From(userId), createdAt, nextReviewDate, frontPrompt, backPrompt, backgroundColour, textColour);
+        TextColour? textColour = null,
+        IReadOnlyList<string>? tagIds = null)
+        => new(id, frontText, backText, deckId, UserId.From(userId), createdAt, nextReviewDate, frontPrompt, backPrompt, backgroundColour, textColour, tagIds);
+
+    public void SetTagIds(IEnumerable<string> tagIds)
+    {
+        var normalized = NormalizeTagIds(tagIds);
+        _tagIds.Clear();
+        _tagIds.AddRange(normalized);
+    }
+
+    public void RemoveTagId(string tagId)
+    {
+        if (string.IsNullOrEmpty(tagId))
+            return;
+
+        _tagIds.RemoveAll(t => t == tagId);
+    }
 
     public void Update(
         string frontText,
@@ -146,5 +171,29 @@ public class Card
         BackPrompt = trimmedBackPrompt;
         BackgroundColour = backgroundColour;
         TextColour = textColour;
+    }
+
+    private static List<string> NormalizeTagIds(IEnumerable<string> tagIds)
+    {
+        var list = new List<string>();
+        foreach (var raw in tagIds)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+                throw new ArgumentException("Tag ID cannot be empty.", nameof(tagIds));
+
+            var id = raw.Trim();
+            if (!Guid.TryParse(id, out _))
+                throw new ArgumentException("Each tag ID must be a valid GUID.", nameof(tagIds));
+
+            if (!list.Contains(id, StringComparer.Ordinal))
+                list.Add(id);
+        }
+
+        list.Sort(StringComparer.Ordinal);
+
+        if (list.Count > MaxTagsPerCard)
+            throw new ArgumentException($"A card cannot have more than {MaxTagsPerCard} tags.", nameof(tagIds));
+
+        return list;
     }
 }
