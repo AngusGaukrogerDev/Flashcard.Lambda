@@ -51,6 +51,17 @@ internal static class FunctionServiceProviderFactory
         return services.BuildServiceProvider();
     }
 
+    public static IServiceProvider BuildDeckAndCardWithoutTags(Action<IServiceCollection> configureHandlers, bool requireCardDeckIndex = true)
+    {
+        var services = new ServiceCollection();
+        services.AddInfrastructure(GetRequiredEnv("DECK_TABLE_NAME"), GetRequiredEnv("DECK_USER_ID_INDEX_NAME"));
+        var cardTableName = GetRequiredEnv("CARD_TABLE_NAME");
+        var cardDeckIndex = requireCardDeckIndex ? GetRequiredEnv("CARD_DECK_ID_INDEX_NAME") : null;
+        services.AddCardInfrastructure(cardTableName, cardDeckIndex);
+        configureHandlers(services);
+        return services.BuildServiceProvider();
+    }
+
     public static IServiceProvider BuildDeckCardAndTags(Action<IServiceCollection> configureHandlers)
     {
         var services = new ServiceCollection();

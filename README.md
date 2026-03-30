@@ -27,6 +27,7 @@ Application → Domain
 |---|---|---|
 | `CreateDeckFunction` | `POST /decks` | Create a new flashcard deck |
 | `GetDecksFunction` | `GET /decks` | List decks for the authenticated user (paginated) |
+| `GetDeckStatsFunction` | `GET /decks/{deckId}/stats` | Get deck-level counts by last recall rating (`new`, `incorrect`, `hard`, `medium`, `easy`) |
 | `UpdateDeckFunction` | `PUT /decks/{deckId}` | Update a deck's name or description |
 | `DeleteDeckFunction` | `DELETE /decks/{deckId}` | Delete a deck |
 
@@ -119,7 +120,7 @@ Card API responses include `recallTrafficLight`: `red` \| `orange` \| `yellow` \
 | `CARD_TABLE_NAME` | DynamoDB table name for cards |
 | `CARD_DECK_ID_INDEX_NAME` | GSI on `DeckId` for listing cards in a deck |
 
-`AddCardToDeckFunction`, `GetCardsByDeckFunction`, and `GetCardsForStudyFunction` require `DECK_TABLE_NAME`, `DECK_USER_ID_INDEX_NAME`, `DECK_TAG_TABLE_NAME`, `DECK_TAG_DECK_ID_INDEX_NAME`, `CARD_TABLE_NAME`, and `CARD_DECK_ID_INDEX_NAME`. Functions that only load a card by id (`GetCardFunction`, `UpdateCardFunction`, `DeleteCardFunction`, `ReviewCardFunction`) need only `CARD_TABLE_NAME`.
+`AddCardToDeckFunction`, `GetCardsByDeckFunction`, and `GetCardsForStudyFunction` require `DECK_TABLE_NAME`, `DECK_USER_ID_INDEX_NAME`, `DECK_TAG_TABLE_NAME`, `DECK_TAG_DECK_ID_INDEX_NAME`, `CARD_TABLE_NAME`, and `CARD_DECK_ID_INDEX_NAME`. `GetDeckStatsFunction` requires `DECK_TABLE_NAME`, `DECK_USER_ID_INDEX_NAME`, `CARD_TABLE_NAME`, and `CARD_DECK_ID_INDEX_NAME`. Functions that only load a card by id (`GetCardFunction`, `UpdateCardFunction`, `DeleteCardFunction`, `ReviewCardFunction`) need only `CARD_TABLE_NAME`.
 
 ## Tech Stack
 
@@ -167,6 +168,7 @@ Replace the handler class name with the function you want to deploy. Available h
 |---|---|
 | `CreateDeckFunction` | Create deck |
 | `GetDecksFunction` | List decks |
+| `GetDeckStatsFunction` | Deck stats (counts by last recall rating) |
 | `UpdateDeckFunction` | Update deck |
 | `DeleteDeckFunction` | Delete deck |
 | `AddCardToDeckFunction` | Add card to deck |
