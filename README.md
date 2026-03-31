@@ -36,11 +36,21 @@ Application → Domain
 | Class | HTTP Method | Description |
 |---|---|---|
 | `AddCardToDeckFunction` | `POST /decks/{deckId}/cards` | Add a new card to a deck |
+| `GetCardsByDeckFunction` | `GET /decks/{deckId}/cards` | List cards for a deck (paginated via `pageSize` and `paginationToken`) |
 | `GetCardFunction` | `GET /cards/{cardId}` | Get a card by ID |
 | `UpdateCardFunction` | `PUT /cards/{cardId}` | Update a card's front or back text |
 | `DeleteCardFunction` | `DELETE /cards/{cardId}` | Delete a card |
 | `ReviewCardFunction` | `POST /cards/{cardId}/review` | Submit a recall rating and update spaced-repetition scheduling |
 | `GetCardsForStudyFunction` | `GET /decks/{deckId}/cards/study` | Cards to study: due first, then soonest upcoming (query `limit`, max 50; default 20) |
+
+### Deck Tag
+
+| Class | HTTP Method | Description |
+|---|---|---|
+| `CreateDeckTagFunction` | `POST /decks/{deckId}/tags` | Create a tag for a deck |
+| `GetDeckTagsFunction` | `GET /decks/{deckId}/tags` | List tags for a deck |
+| `UpdateDeckTagFunction` | `PUT /decks/{deckId}/tags/{tagId}` | Rename a deck tag |
+| `DeleteDeckTagFunction` | `DELETE /decks/{deckId}/tags/{tagId}` | Delete a deck tag |
 
 ## Authentication
 
@@ -73,6 +83,16 @@ All use cases follow a command/query pattern:
 | Command | `ReviewCardCommand` / `ReviewCardCommandHandler` | Record recall (`incorrect`, `hard`, `medium`, `easy`) and reschedule |
 | Query | `GetCardByIdQuery` / `GetCardByIdQueryHandler` | Get a card by ID |
 | Query | `GetCardsForStudyQuery` / `GetCardsForStudyQueryHandler` | Study queue for a deck |
+| Query | `GetCardsByDeckQuery` / `GetCardsByDeckQueryHandler` | List cards in a deck (paginated) |
+
+### Deck Tag
+
+| Type | Class | Description |
+|---|---|---|
+| Command | `CreateDeckTagCommand` / `CreateDeckTagCommandHandler` | Create a tag for a deck |
+| Command | `UpdateDeckTagCommand` / `UpdateDeckTagCommandHandler` | Rename a deck tag |
+| Command | `DeleteDeckTagCommand` / `DeleteDeckTagCommandHandler` | Delete a deck tag |
+| Query | `GetDeckTagsQuery` / `GetDeckTagsQueryHandler` | List tags for a deck |
 
 ## Data Storage
 
@@ -111,6 +131,20 @@ Stored in a separate DynamoDB table with the following structure:
 
 Card API responses include `recallTrafficLight`: `red` \| `orange` \| `yellow` \| `green` mapped from the last recall rating (`null` if never reviewed).
 
+### Deck Tags
+
+Stored in a separate DynamoDB table with the following structure:
+
+| Attribute | Type | Notes |
+|---|---|---|
+| `Id` | String (UUID) | Partition key |
+| `DeckId` | String | GSI partition key (for listing by deck) |
+| `UserId` | String | Owner user id |
+| `Name` | String | Max length 100 (see `DeckTag.MaxNameLength`) |
+| `CreatedAt` | String (ISO 8601) | |
+
+The GSI name is supplied via the `DECK_TAG_DECK_ID_INDEX_NAME` environment variable.
+
 ### Environment variables
 
 | Variable | Description |
@@ -119,8 +153,19 @@ Card API responses include `recallTrafficLight`: `red` \| `orange` \| `yellow` \
 | `DECK_USER_ID_INDEX_NAME` | Name of the GSI on `UserId` for the decks table |
 | `CARD_TABLE_NAME` | DynamoDB table name for cards |
 | `CARD_DECK_ID_INDEX_NAME` | GSI on `DeckId` for listing cards in a deck |
+| `DECK_TAG_TABLE_NAME` | DynamoDB table name for deck tags |
+| `DECK_TAG_DECK_ID_INDEX_NAME` | Name of the GSI on `DeckId` for the deck tags table |
 
-`AddCardToDeckFunction`, `GetCardsByDeckFunction`, and `GetCardsForStudyFunction` require `DECK_TABLE_NAME`, `DECK_USER_ID_INDEX_NAME`, `DECK_TAG_TABLE_NAME`, `DECK_TAG_DECK_ID_INDEX_NAME`, `CARD_TABLE_NAME`, and `CARD_DECK_ID_INDEX_NAME`. `GetDeckStatsFunction` requires `DECK_TABLE_NAME`, `DECK_USER_ID_INDEX_NAME`, `CARD_TABLE_NAME`, and `CARD_DECK_ID_INDEX_NAME`. Functions that only load a card by id (`GetCardFunction`, `UpdateCardFunction`, `DeleteCardFunction`, `ReviewCardFunction`) need only `CARD_TABLE_NAME`.
+Per-function requirements (based on the service provider factory used by each Lambda):
+
+- **Deck only** (`CreateDeckFunction`, `GetDecksFunction`, `UpdateDeckFunction`, `DeleteDeckFunction`) require `DECK_TABLE_NAME` and `DECK_USER_ID_INDEX_NAME`.
+- **Card only** (`GetCardFunction`, `UpdateCardFunction`, `DeleteCardFunction`, `ReviewCardFunction`) require `CARD_TABLE_NAME`.
+- **Deck + Cards (no tags)** (`GetDeckStatsFunction`) requires `DECK_TABLE_NAME`, `DECK_USER_ID_INDEX_NAME`, `CARD_TABLE_NAME`, and `CARD_DECK_ID_INDEX_NAME`.
+- **Deck + Tags** (`CreateDeckTagFunction`, `GetDeckTagsFunction`, `UpdateDeckTagFunction`) require `DECK_TABLE_NAME`, `DECK_USER_ID_INDEX_NAME`, `DECK_TAG_TABLE_NAME`, and `DECK_TAG_DECK_ID_INDEX_NAME`.
+- **Deck + Cards + Tags**:
+  - `AddCardToDeckFunction` requires `DECK_TABLE_NAME`, `DECK_USER_ID_INDEX_NAME`, `DECK_TAG_TABLE_NAME`, `DECK_TAG_DECK_ID_INDEX_NAME`, and `CARD_TABLE_NAME`.
+  - `GetCardsByDeckFunction` and `GetCardsForStudyFunction` require `DECK_TABLE_NAME`, `DECK_USER_ID_INDEX_NAME`, `DECK_TAG_TABLE_NAME`, `DECK_TAG_DECK_ID_INDEX_NAME`, `CARD_TABLE_NAME`, and `CARD_DECK_ID_INDEX_NAME`.
+- **Deck + Cards + Tags** (`DeleteDeckTagFunction`) requires `DECK_TABLE_NAME`, `DECK_USER_ID_INDEX_NAME`, `DECK_TAG_TABLE_NAME`, `DECK_TAG_DECK_ID_INDEX_NAME`, `CARD_TABLE_NAME`, and `CARD_DECK_ID_INDEX_NAME`.
 
 ## Tech Stack
 
@@ -172,11 +217,16 @@ Replace the handler class name with the function you want to deploy. Available h
 | `UpdateDeckFunction` | Update deck |
 | `DeleteDeckFunction` | Delete deck |
 | `AddCardToDeckFunction` | Add card to deck |
+| `GetCardsByDeckFunction` | List cards in a deck (paginated) |
 | `GetCardFunction` | Get card by ID |
 | `UpdateCardFunction` | Update card |
 | `DeleteCardFunction` | Delete card |
 | `ReviewCardFunction` | Submit recall rating for a card |
 | `GetCardsForStudyFunction` | Study queue for a deck |
+| `CreateDeckTagFunction` | Create deck tag |
+| `GetDeckTagsFunction` | List deck tags |
+| `UpdateDeckTagFunction` | Update deck tag |
+| `DeleteDeckTagFunction` | Delete deck tag |
 
 `Flashcards.Functions/aws-lambda-tools-defaults.json` contains default deployment configuration (runtime `dotnet8`, 512 MB memory, 30 s timeout). Ensure your AWS profile and region are configured before deploying.
 
